@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CopilotDiffPersistence">
+    <option name="pendingDiffs">
+      <map>
+        <entry key="$PROJECT_DIR$/docker-compose.yml">
+          <value>
+            <PendingDiffInfo>
+              <option name="filePath" value="$PROJECT_DIR$/docker-compose.yml" />
+              <option name="originalContent" value="version: &quot;3.9&quot;&#10;services:&#10;  service-discovery:&#10;    build: ./service-discovery&#10;    ports:&#10;      - &quot;8761:8761&quot;&#10;&#10;  api-gateway:&#10;    build: ./api-gateway&#10;    ports:&#10;      - &quot;8080:8080&quot;&#10;    depends_on:&#10;      - service-discovery&#10;&#10;  user-service:&#10;    build: ./user-service&#10;    depends_on:&#10;      - service-discovery&#10;&#10;  restaurant-service:&#10;    build: ./restaurant-service&#10;    depends_on:&#10;      - service-discovery&#10;&#10;  order-service:&#10;    build: ./order-service&#10;    depends_on:&#10;      - service-discovery&#10;&#10;  payment-service:&#10;    build: ./payment-service&#10;    depends_on:&#10;      - service-discovery&#10;&#10;  notification-service:&#10;    build: ./notification-service&#10;    depends_on:&#10;      - service-discovery&#10;" />
+              <option name="updatedContent" value="services:&#10;  service-discovery:&#10;    build: ./service-discovery&#10;    ports:&#10;      - &quot;8761:8761&quot;&#10;&#10;  api-gateway:&#10;    build: ./api-gateway&#10;    ports:&#10;      - &quot;8080:8080&quot;&#10;    depends_on:&#10;      - service-discovery&#10;&#10;  user-service:&#10;    build: ./user-service&#10;    depends_on:&#10;      - service-discovery&#10;&#10;  restaurant-service:&#10;    build: ./restaurant-service&#10;    depends_on:&#10;      - service-discovery&#10;&#10;  order-service:&#10;    build: ./order-service&#10;    depends_on:&#10;      - service-discovery&#10;&#10;  payment-service:&#10;    build: ./payment-service&#10;    depends_on:&#10;      - service-discovery&#10;&#10;  notification-service:&#10;    build: ./notification-service&#10;    depends_on:&#10;      - service-discovery" />
+            </PendingDiffInfo>
+          </value>
+        </entry>
+        <entry key="$PROJECT_DIR$/user-service/Dockerfile">
+          <value>
+            <PendingDiffInfo>
+              <option name="filePath" value="$PROJECT_DIR$/user-service/Dockerfile" />
+              <option name="originalContent" value="FROM eclipse-temurin:17-jdk-alpine&#10;VOLUME /tmp&#10;ARG JAR_FILE=target/*.jar&#10;COPY ${JAR_FILE} app.jar&#10;ENTRYPOINT [&quot;java&quot;,&quot;-jar&quot;,&quot;/app.jar&quot;]&#10;" />
+              <option name="updatedContent" value="FROM eclipse-temurin:17-jdk&#10;VOLUME /tmp&#10;ARG JAR_FILE=target/*.jar&#10;COPY ${JAR_FILE} app.jar&#10;ENTRYPOINT [&quot;java&quot;,&quot;-jar&quot;,&quot;/app.jar&quot;]" />
+            </PendingDiffInfo>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+</project>

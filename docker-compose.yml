@@ -1,0 +1,37 @@
+services:
+  service-discovery:
+    build: ./service-discovery
+    ports:
+      - "8761:8761"
+
+  api-gateway:
+    build: ./api-gateway
+    ports:
+      - "8080:8080"
+    depends_on:
+      - service-discovery
+
+  user-service:
+    build: ./user-service
+    depends_on:
+      - service-discovery
+
+  restaurant-service:
+    build: ./restaurant-service
+    depends_on:
+      - service-discovery
+
+  order-service:
+    build: ./order-service
+    depends_on:
+      - service-discovery
+
+  payment-service:
+    build: ./payment-service
+    depends_on:
+      - service-discovery
+
+  notification-service:
+    build: ./notification-service
+    depends_on:
+      - service-discovery
