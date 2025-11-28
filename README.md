@@ -1,3 +1,5 @@
+⚠️ Status: This project is currently a work in progress. Several services and features are still under development.
+
 # Food Delivery Microservices
 
 A demo microservices system built with Java 17 and Spring Boot.
