@@ -1,4 +1,18 @@
 services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: fooddb
+      POSTGRES_USER: food
+      POSTGRES_PASSWORD: food
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U food -d fooddb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   service-discovery:
     build: ./service-discovery
     ports:
@@ -15,16 +29,19 @@ services:
     build: ./user-service
     depends_on:
       - service-discovery
+      - postgres
 
   restaurant-service:
     build: ./restaurant-service
     depends_on:
       - service-discovery
+      - postgres
 
   order-service:
     build: ./order-service
     depends_on:
       - service-discovery
+      - postgres
 
   payment-service:
     build: ./payment-service

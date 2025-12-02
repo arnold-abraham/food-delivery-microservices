@@ -5,16 +5,18 @@ spring:
   application:
     name: restaurant-service
   datasource:
-    url: jdbc:h2:mem:restaurants;DB_CLOSE_DELAY=-1
-    driverClassName: org.h2.Driver
-    username: sa
-    password: sa
+    url: jdbc:postgresql://${DB_HOST:postgres}:5432/fooddb
+    username: food
+    password: food
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
 
 eureka:
   client:
     service-url:
-      defaultZone: http://service-discovery:8761/eureka/
+      defaultZone: ${EUREKA_URL:http://service-discovery:8761/eureka/}

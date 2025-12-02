@@ -2,6 +2,8 @@ server:
   port: 8079
 
 spring:
+  main:
+    web-application-type: reactive
   application:
     name: api-gateway
   cloud:
@@ -19,8 +21,16 @@ spring:
           uri: lb://order-service
           predicates:
             - Path=/orders/**
+        - id: payment-service
+          uri: lb://payment-service
+          predicates:
+            - Path=/payments/**
+        - id: notification-service
+          uri: lb://notification-service
+          predicates:
+            - Path=/notifications/**
 
 eureka:
   client:
     service-url:
-      defaultZone: http://service-discovery:8761/eureka/
+      defaultZone: ${EUREKA_URL:http://service-discovery:8761/eureka/}
