@@ -1,21 +1,24 @@
-spring:
-          application:
-            name: order-service
-        server:
-          port: 8083
+server:
+  port: 8083
 
-
-eureka:
-  client:
-    service-url:
-      defaultZone: http://localhost:8761/eureka/
 spring:
+  application:
+    name: order-service
   datasource:
-    url: jdbc:h2:mem:orders;DB_CLOSE_DELAY=-1
-    driverClassName: org.h2.Driver
-    username: sa
-    password: sa
+    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:orderdb}
+    username: ${DB_USER:food}
+    password: ${DB_PASSWORD:food}
+    driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+# Eureka service discovery
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://service-discovery:8761/eureka/}

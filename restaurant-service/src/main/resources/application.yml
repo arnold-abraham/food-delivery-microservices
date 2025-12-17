@@ -5,9 +5,10 @@ spring:
   application:
     name: restaurant-service
   datasource:
-    url: jdbc:postgresql://${DB_HOST:postgres}:5432/fooddb
-    username: food
-    password: food
+    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:restaurantdb}
+    username: ${DB_USER:food}
+    password: ${DB_PASSWORD:food}
+    driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
       ddl-auto: update
