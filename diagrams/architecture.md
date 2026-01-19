@@ -1,12 +1,41 @@
 # Architecture Overview
 
 ```text
-api-gateway  -->  user-service
-              -->  restaurant-service
-              -->  order-service
+                +-------------------+
+                | service-discovery |
+                |    (Eureka)       |
+                +---------+---------+
+                          ^
+                 registers|discovers
+                          v
++-------------------+   routes   +-------------------+
+|    api-gateway    +----------->|   user-service    |
+| (Spring Gateway)  |            |  (Postgres:userdb)|
++-------------------+            +-------------------+
+        | routes                  
+        +-----------------------> +-------------------+
+        |                         | restaurant-service |
+        |                         | (Postgres:restdb) |
+        |                         +-------------------+
+        | routes
+        +-----------------------> +-------------------+
+                                  |   order-service   |
+                                  | (Postgres:orderdb)|
+                                  +---------+---------+
+                                            |
+                                            | HTTP POST /payments
+                                            v
+                                  +-------------------+
+                                  |  payment-service  |
+                                  +---------+---------+
+                                            |
+                                            | HTTP POST /notifications
+                                            v
+                                  +-------------------+
+                                  |notification-service|
+                                  +-------------------+
 
-order-service  --(event: OrderCreated)-->  payment-service
-payment-service --(event: PaymentCompleted)--> notification-service
-
-All services register with service-discovery (Eureka).
-```
+Notes:
+- Postgres is a single container, but we use separate databases per service.
+- Order -> Payment -> Notification is synchronous HTTP for the base version.
+````
