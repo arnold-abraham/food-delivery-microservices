@@ -14,8 +14,11 @@ public class OrderService {
     private final OrderRepository repository;
     private final RestTemplate restTemplate;
 
-    @Value("${PAYMENT_SERVICE_URL:http://payment-service:8084}")
+    @Value("${order.payment-service-url:http://payment-service:8084}")
     private String paymentServiceBaseUrl;
+
+    @Value("${order.notification-service-url:http://notification-service:8085}")
+    private String notificationServiceBaseUrl;
 
     public OrderService(OrderRepository repository, RestTemplate restTemplate) {
         this.repository = repository;
@@ -34,18 +37,39 @@ public class OrderService {
     @Transactional
     public Optional<Order> pay(Long orderId, double amount) {
         return repository.findById(orderId).map(order -> {
-            String url = paymentServiceBaseUrl + "/payments";
-            Map<String, Object> request = Map.of(
+            // 1) Call payment-service
+            String paymentUrl = paymentServiceBaseUrl + "/payments";
+            Map<String, Object> paymentRequest = Map.of(
                     "orderId", order.getId(),
                     "amount", amount
             );
 
-            Map<?, ?> response = restTemplate.postForObject(url, request, Map.class);
-            String status = response != null && "SUCCESS".equalsIgnoreCase(String.valueOf(response.get("status")))
-                    ? "PAID" : "FAILED";
+            Map<?, ?> paymentResponse = restTemplate.postForObject(paymentUrl, paymentRequest, Map.class);
+            boolean paymentSuccess = paymentResponse != null &&
+                    "SUCCESS".equalsIgnoreCase(String.valueOf(paymentResponse.get("status")));
 
-            order.setStatus(status);
-            return repository.save(order);
+            String newStatus = paymentSuccess ? "PAID" : "FAILED";
+            order.setStatus(newStatus);
+            Order saved = repository.save(order);
+
+            // 2) Best-effort notification
+            try {
+                String notificationUrl = notificationServiceBaseUrl + "/notifications";
+                String message = paymentSuccess
+                        ? "Order %d payment successful".formatted(saved.getId())
+                        : "Order %d payment failed".formatted(saved.getId());
+
+                Map<String, Object> notificationRequest = Map.of(
+                        "orderId", saved.getId(),
+                        "message", message
+                );
+
+                restTemplate.postForObject(notificationUrl, notificationRequest, Map.class);
+            } catch (Exception ignored) {
+                // Do not fail the payment flow if notification fails
+            }
+
+            return saved;
         });
     }
 }
