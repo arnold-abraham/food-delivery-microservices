@@ -10,6 +10,7 @@ import java.util.Map;
 @RequestMapping("/orders")
 public class OrderController {
     private record CreateOrderRequest(Long userId, Long restaurantId) {}
+    private record PayOrderRequest(Double amount) {}
     private record OrderResponse(Long id, Long userId, Long restaurantId, String status) {}
 
     private final OrderService service;
@@ -33,5 +34,12 @@ public class OrderController {
         return service.listAll().stream()
                 .map(o -> new OrderResponse(o.getId(), o.getUserId(), o.getRestaurantId(), o.getStatus()))
                 .toList();
+    }
+
+    @PostMapping("/{id}/pay")
+    public ResponseEntity<?> pay(@PathVariable Long id, @RequestBody PayOrderRequest req) {
+        return service.pay(id, req.amount() != null ? req.amount() : 0.0)
+                .<ResponseEntity<?>>map(o -> ResponseEntity.ok(new OrderResponse(o.getId(), o.getUserId(), o.getRestaurantId(), o.getStatus())))
+                .orElseGet(() -> ResponseEntity.status(404).body(Map.of("error", "Order not found")));
     }
 }
