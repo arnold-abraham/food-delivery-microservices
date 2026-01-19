@@ -8,6 +8,21 @@ spring:
     name: api-gateway
   cloud:
     gateway:
+      # Allow browser access (dev-friendly). Tighten for production.
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins:
+              - "*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - OPTIONS
+            allowedHeaders:
+              - "*"
       routes:
         - id: user-service
           uri: lb://user-service
