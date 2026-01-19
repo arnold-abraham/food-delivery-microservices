@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: food
       POSTGRES_PASSWORD: food
     ports:
-      - "5432:5432"
+      - "5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U food -d fooddb"]
       interval: 10s

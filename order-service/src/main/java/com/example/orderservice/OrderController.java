@@ -3,6 +3,7 @@ package com.example.orderservice;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -26,5 +27,11 @@ public class OrderController {
                 .<ResponseEntity<?>>map(o -> ResponseEntity.ok(new OrderResponse(o.getId(), o.getUserId(), o.getRestaurantId(), o.getStatus())))
                 .orElseGet(() -> ResponseEntity.status(404).body(Map.of("error", "Order not found")));
     }
-}
 
+    @GetMapping
+    public List<OrderResponse> list() {
+        return service.listAll().stream()
+                .map(o -> new OrderResponse(o.getId(), o.getUserId(), o.getRestaurantId(), o.getStatus()))
+                .toList();
+    }
+}

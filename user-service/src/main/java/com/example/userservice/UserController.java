@@ -3,13 +3,14 @@ package com.example.userservice;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/users")
 public class UserController {
-    public static record CreateUserRequest(String name, String email) {}
-    public static record UserResponse(Long id, String name, String email) {}
+    public record CreateUserRequest(String name, String email) {}
+    public record UserResponse(Long id, String name, String email) {}
 
     private final UserService service;
     public UserController(UserService service) { this.service = service; }
@@ -25,5 +26,12 @@ public class UserController {
         return service.get(id)
                 .<ResponseEntity<?>>map(u -> ResponseEntity.ok(new UserResponse(u.getId(), u.getName(), u.getEmail())))
                 .orElseGet(() -> ResponseEntity.status(404).body(Map.of("error", "User not found")));
+    }
+
+    @GetMapping
+    public List<UserResponse> list() {
+        return service.listAll().stream()
+                .map(u -> new UserResponse(u.getId(), u.getName(), u.getEmail()))
+                .toList();
     }
 }

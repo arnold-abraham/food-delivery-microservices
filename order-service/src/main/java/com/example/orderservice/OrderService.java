@@ -3,6 +3,7 @@ package com.example.orderservice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -13,5 +14,5 @@ public class OrderService {
     @Transactional
     public Order create(Long userId, Long restaurantId) { return repository.save(new Order(userId, restaurantId, "PENDING")); }
     public Optional<Order> get(Long id) { return repository.findById(id); }
+    public List<Order> listAll() { return repository.findAll(); }
 }
-
