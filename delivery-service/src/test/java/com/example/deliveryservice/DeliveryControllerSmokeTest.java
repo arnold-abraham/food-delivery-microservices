@@ -52,6 +52,12 @@ class DeliveryControllerSmokeTest {
 
         Long id = mapper.readTree(createdJson).get("id").asLong();
 
+        // can fetch by orderId
+        mvc.perform(get("/deliveries/by-order/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id.intValue()))
+                .andExpect(jsonPath("$.status").value("ASSIGNED"));
+
         var updateBody = mapper.writeValueAsString(new DeliveryController.UpdateDeliveryStatusRequest("PICKED_UP"));
 
         mvc.perform(patch("/deliveries/" + id + "/status")

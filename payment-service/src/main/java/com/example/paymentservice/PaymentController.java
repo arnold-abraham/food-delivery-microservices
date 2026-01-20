@@ -5,23 +5,31 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
-import java.util.Random;
-
 @RestController
 @RequestMapping("/payments")
 public class PaymentController {
     private static final Logger log = LoggerFactory.getLogger(PaymentController.class);
-    private record PaymentRequest(Long orderId, Double amount) {}
-    private record PaymentResponse(Long orderId, String status) {}
-    private final Random random = new Random();
+
+    private record PaymentRequest(Long orderId, Double amount, Double expectedAmount) {}
+    private record PaymentResponse(Long orderId, String status, String message) {}
 
     @PostMapping
     public ResponseEntity<PaymentResponse> pay(@RequestBody PaymentRequest req) {
-        boolean success = random.nextDouble() > 0.1; // 90% success
-        String status = success ? "SUCCESS" : "FAILED";
-        log.info("Processed payment orderId={} amount={} status={}", req.orderId(), req.amount(), status);
-        return ResponseEntity.ok(new PaymentResponse(req.orderId(), status));
+        boolean ok = req != null
+                && req.orderId() != null
+                && req.amount() != null
+                && req.amount() > 0
+                && (req.expectedAmount() == null || Double.compare(req.amount(), req.expectedAmount()) == 0);
+
+        String status = ok ? "SUCCESS" : "FAILED";
+        String message = ok ? "Payment accepted" : "Amount mismatch";
+
+        log.info("Processed payment orderId={} amount={} expectedAmount={} status={}",
+                req != null ? req.orderId() : null,
+                req != null ? req.amount() : null,
+                req != null ? req.expectedAmount() : null,
+                status);
+
+        return ResponseEntity.ok(new PaymentResponse(req != null ? req.orderId() : null, status, message));
     }
 }
-

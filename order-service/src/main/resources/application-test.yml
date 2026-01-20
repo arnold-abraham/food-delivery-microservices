@@ -13,9 +13,9 @@ eureka:
   client:
     enabled: false
 
-# Use local stub URLs during tests (wired via @TestConfiguration)
+# Use local stub URLs during tests (MockRestServiceServer intercepts RestTemplate)
 order:
   payment-service-url: http://localhost
   delivery-service-url: http://localhost
   user-service-url: http://localhost
-
+  restaurant-service-url: http://localhost

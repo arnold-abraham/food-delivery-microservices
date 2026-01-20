@@ -14,6 +14,7 @@ import java.util.Optional;
 @Service
 public class OrderService {
     private final OrderRepository repository;
+    private final OrderItemRepository orderItemRepository;
     private final RestTemplate restTemplate;
 
     @Value("${order.payment-service-url:http://payment-service:8084}")
@@ -25,28 +26,71 @@ public class OrderService {
     @Value("${order.user-service-url:http://user-service:8081}")
     private String userServiceBaseUrl;
 
-    public OrderService(OrderRepository repository, RestTemplate restTemplate) {
+    @Value("${order.restaurant-service-url:http://restaurant-service:8082}")
+    private String restaurantServiceBaseUrl;
+
+    public OrderService(OrderRepository repository, OrderItemRepository orderItemRepository, RestTemplate restTemplate) {
         this.repository = repository;
+        this.orderItemRepository = orderItemRepository;
         this.restTemplate = restTemplate;
     }
 
     @Transactional
-    public Order create(Long userId, Long restaurantId) {
-        return repository.save(new Order(userId, restaurantId, "PENDING"));
+    public Order create(Long userId, Long restaurantId, List<CreateOrderItem> items) {
+        Order order = repository.save(new Order(userId, restaurantId, "PENDING"));
+
+        double total = 0.0;
+        if (items != null) {
+            for (CreateOrderItem it : items) {
+                if (it.quantity() <= 0) {
+                    throw new IllegalArgumentException("quantity must be >= 1");
+                }
+
+                // Fetch menu item from restaurant-service to get price + validate it belongs to restaurant
+                String url = restaurantServiceBaseUrl + "/restaurants/" + restaurantId + "/menu/" + it.menuItemId();
+                Map<?, ?> menuItem = restTemplate.getForObject(url, Map.class);
+                if (menuItem == null || menuItem.get("price") == null) {
+                    throw new IllegalArgumentException("Menu item not found: " + it.menuItemId());
+                }
+
+                double unitPrice = Double.parseDouble(String.valueOf(menuItem.get("price")));
+                orderItemRepository.save(new OrderItem(order.getId(), it.menuItemId(), it.quantity(), unitPrice));
+                total += unitPrice * it.quantity();
+            }
+        }
+
+        order.setTotalAmount(total);
+        return repository.save(order);
     }
 
-    public Optional<Order> get(Long id) { return repository.findById(id); }
+    @Transactional
+    public Order create(Long userId, Long restaurantId) {
+        return create(userId, restaurantId, List.of());
+    }
 
-    public List<Order> listAll() { return repository.findAll(); }
+    public Optional<Order> get(Long id) {
+        return repository.findById(id);
+    }
+
+    public List<Order> listAll() {
+        return repository.findAll();
+    }
+
+    public List<OrderItem> getItems(Long orderId) {
+        return orderItemRepository.findByOrderId(orderId);
+    }
 
     @Transactional
     public Optional<Order> pay(Long orderId, double amount, Long driverId) {
         return repository.findById(orderId).map(order -> {
-            // Call payment-service
+            double expectedAmount = order.getTotalAmount() != null ? order.getTotalAmount() : 0.0;
+
+            // Call payment-service (exact amount validation via expectedAmount)
             String paymentUrl = paymentServiceBaseUrl + "/payments";
             Map<String, Object> paymentRequest = Map.of(
                     "orderId", order.getId(),
-                    "amount", amount
+                    "amount", amount,
+                    "expectedAmount", expectedAmount
             );
 
             Map<?, ?> paymentResponse = restTemplate.postForObject(paymentUrl, paymentRequest, Map.class);
@@ -77,10 +121,43 @@ public class OrderService {
                         "orderId", saved.getId(),
                         "driverId", effectiveDriverId
                 );
-                restTemplate.postForObject(deliveryUrl, deliveryRequest, Map.class);
+                Map<?, ?> delivery = restTemplate.postForObject(deliveryUrl, deliveryRequest, Map.class);
+
+                // Store initial delivery status (best-effort)
+                if (delivery != null && delivery.get("status") != null) {
+                    saved.setDeliveryStatus(String.valueOf(delivery.get("status")));
+                    saved = repository.save(saved);
+                } else {
+                    saved.setDeliveryStatus("ASSIGNED");
+                    saved = repository.save(saved);
+                }
             }
 
             return saved;
+        });
+    }
+
+    @Transactional
+    public Optional<Order> syncDeliveryStatus(Long orderId) {
+        return repository.findById(orderId).map(order -> {
+            String url = deliveryServiceBaseUrl + "/deliveries/by-order/" + order.getId();
+            try {
+                Map<?, ?> delivery = restTemplate.getForObject(url, Map.class);
+                if (delivery != null && delivery.get("status") != null) {
+                    String status = String.valueOf(delivery.get("status"));
+                    order.setDeliveryStatus(status);
+                    if ("DELIVERED".equalsIgnoreCase(status)) {
+                        order.setStatus("DELIVERED");
+                    }
+                    return repository.save(order);
+                }
+            } catch (HttpClientErrorException ex) {
+                if (ex.getStatusCode() == HttpStatus.NOT_FOUND) {
+                    return order;
+                }
+                throw ex;
+            }
+            return order;
         });
     }
 
@@ -89,4 +166,6 @@ public class OrderService {
     public Optional<Order> pay(Long orderId, double amount) {
         return pay(orderId, amount, null);
     }
+
+    public record CreateOrderItem(Long menuItemId, int quantity) {}
 }

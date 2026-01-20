@@ -41,6 +41,13 @@ public class DeliveryController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    @GetMapping("/by-order/{orderId}")
+    public ResponseEntity<?> getByOrderId(@PathVariable Long orderId) {
+        return service.getByOrderId(orderId)
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.status(404).body(Map.of("error", "Delivery not found")));
+    }
+
     @PostMapping
     public ResponseEntity<Delivery> create(@Valid @RequestBody CreateDeliveryRequest req) {
         Delivery created = service.createAssignment(req.orderId(), req.driverId());

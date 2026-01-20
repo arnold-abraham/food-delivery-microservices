@@ -19,6 +19,10 @@ public class DeliveryService {
         return repository.findById(id);
     }
 
+    public Optional<Delivery> getByOrderId(Long orderId) {
+        return repository.findFirstByOrderId(orderId);
+    }
+
     public List<Delivery> listAll() {
         return repository.findAll();
     }
