@@ -18,7 +18,8 @@ public class OrderController {
     ) {}
 
     public record PayOrderRequest(
-            @NotNull(message = "amount is required") @Min(value = 1, message = "amount must be >= 1") Double amount
+            @NotNull(message = "amount is required") @Min(value = 1, message = "amount must be >= 1") Double amount,
+            @Min(value = 1, message = "driverId must be >= 1") Long driverId
     ) {}
 
     public record OrderResponse(Long id, Long userId, Long restaurantId, String status) {}
@@ -48,7 +49,7 @@ public class OrderController {
 
     @PostMapping("/{id}/pay")
     public ResponseEntity<?> pay(@PathVariable Long id, @Valid @RequestBody PayOrderRequest req) {
-        return service.pay(id, req.amount())
+        return service.pay(id, req.amount(), req.driverId())
                 .<ResponseEntity<?>>map(o -> ResponseEntity.ok(new OrderResponse(o.getId(), o.getUserId(), o.getRestaurantId(), o.getStatus())))
                 .orElseGet(() -> ResponseEntity.status(404).body(Map.of("error", "Order not found")));
     }

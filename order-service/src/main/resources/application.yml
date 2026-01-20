@@ -26,3 +26,5 @@ eureka:
 # Upstream service URLs (overridable via env vars)
 order:
   payment-service-url: ${PAYMENT_SERVICE_URL:http://payment-service:8084}
+  delivery-service-url: ${DELIVERY_SERVICE_URL:http://delivery-service:8086}
+  user-service-url: ${USER_SERVICE_URL:http://user-service:8081}

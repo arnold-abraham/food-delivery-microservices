@@ -48,4 +48,14 @@ class OrderControllerValidationTest {
                 .andExpect(jsonPath("$.error").value("Validation failed"))
                 .andExpect(jsonPath("$.fields.amount").exists());
     }
+
+    @Test
+    void pay_invalidDriverId_returns400WithFields() throws Exception {
+        mvc.perform(post("/orders/1/pay")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"amount\":10,\"driverId\":0}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Validation failed"))
+                .andExpect(jsonPath("$.fields.driverId").exists());
+    }
 }
