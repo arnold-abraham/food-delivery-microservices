@@ -67,9 +67,3 @@ services:
     depends_on:
       service-discovery:
         condition: service_healthy
-
-  notification-service:
-    build: ./notification-service
-    depends_on:
-      service-discovery:
-        condition: service_healthy

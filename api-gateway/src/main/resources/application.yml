@@ -40,10 +40,6 @@ spring:
           uri: lb://payment-service
           predicates:
             - Path=/payments/**
-        - id: notification-service
-          uri: lb://notification-service
-          predicates:
-            - Path=/notifications/**
 
 eureka:
   client:

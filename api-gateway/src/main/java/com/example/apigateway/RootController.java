@@ -18,8 +18,7 @@ public class RootController {
                         "/users/**",
                         "/restaurants/**",
                         "/orders/**",
-                        "/payments/**",
-                        "/notifications/**"
+                        "/payments/**"
                 ),
                 "health", "/health",
                 "eureka", "http://localhost:8761"

@@ -27,15 +27,9 @@
                                             v
                                   +-------------------+
                                   |  payment-service  |
-                                  +---------+---------+
-                                            |
-                                            | HTTP POST /notifications
-                                            v
-                                  +-------------------+
-                                  |notification-service|
                                   +-------------------+
 
 Notes:
 - Postgres is a single container, but we use separate databases per service.
-- Order -> Payment -> Notification is synchronous HTTP for the base version.
-````
+- Order -> Payment is synchronous HTTP for the base version.
+```

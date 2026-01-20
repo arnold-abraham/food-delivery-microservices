@@ -8,10 +8,6 @@ Run unit/controller tests for all modules:
 mvn test
 ```
 
-These tests are intentionally lightweight:
-- `@WebMvcTest` controller tests validate request validation and error responses
-- a small smoke test for payment controller
-
 ## Manual end-to-end smoke test (Docker)
 
 Start the stack:
@@ -45,10 +41,3 @@ curl -X POST http://localhost:8079/orders/1/pay \
 
 curl http://localhost:8079/orders/1
 ```
-
-Check notifications:
-
-```bash
-docker compose logs -f notification-service
-```
-

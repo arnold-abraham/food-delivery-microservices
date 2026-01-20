@@ -10,7 +10,6 @@ A demo microservices system built with Java 17, Spring Boot 3.x, Eureka service 
 - Order workflow:
   - create order (PENDING)
   - pay order -> status becomes PAID or FAILED
-  - send a notification after payment attempt
 - Input validation and consistent 400 responses for invalid payloads
 
 ## Services
@@ -21,7 +20,6 @@ A demo microservices system built with Java 17, Spring Boot 3.x, Eureka service 
 - **restaurant-service**: manages restaurants (`/restaurants/**`)
 - **order-service**: handles orders + pay workflow (`/orders/**`)
 - **payment-service**: simulates payments (`/payments/**`)
-- **notification-service**: logs notifications (`/notifications/**`)
 
 ## Run locally (Docker)
 
@@ -59,12 +57,6 @@ curl -X POST http://localhost:8079/orders/1/pay \
 
 # Verify order status
 curl http://localhost:8079/orders/1
-```
-
-To see notifications being produced:
-
-```bash
-docker compose logs -f notification-service
 ```
 
 ## Databases
