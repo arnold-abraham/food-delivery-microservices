@@ -29,6 +29,7 @@
         <module>restaurant-service</module>
         <module>order-service</module>
         <module>payment-service</module>
+        <module>delivery-service</module>
     </modules>
 
     <dependencyManagement>

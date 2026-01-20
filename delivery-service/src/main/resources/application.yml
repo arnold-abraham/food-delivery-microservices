@@ -1,0 +1,31 @@
+server:
+  port: 8086
+
+spring:
+  application:
+    name: delivery-service
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:deliverydb}
+    username: ${DB_USER:food}
+    password: ${DB_PASSWORD:food}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+# Eureka service discovery
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://service-discovery:8761/eureka/}
+

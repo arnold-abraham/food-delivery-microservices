@@ -67,3 +67,11 @@ services:
     depends_on:
       service-discovery:
         condition: service_healthy
+
+  delivery-service:
+    build: ./delivery-service
+    depends_on:
+      service-discovery:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy

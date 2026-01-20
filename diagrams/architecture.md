@@ -19,14 +19,20 @@
         |                         +-------------------+
         | routes
         +-----------------------> +-------------------+
-                                  |   order-service   |
-                                  | (Postgres:orderdb)|
-                                  +---------+---------+
-                                            |
-                                            | HTTP POST /payments
-                                            v
-                                  +-------------------+
-                                  |  payment-service  |
+        |                         |   order-service   |
+        |                         | (Postgres:orderdb)|
+        |                         +---------+---------+
+        |                                   |
+        |                                   | HTTP POST /payments
+        |                                   v
+        |                         +-------------------+
+        |                         |  payment-service  |
+        |                         +-------------------+
+        |
+        | routes
+        +-----------------------> +-------------------+
+                                  | delivery-service  |
+                                  |(Postgres:deliverydb)|
                                   +-------------------+
 
 Notes:

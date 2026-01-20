@@ -6,10 +6,11 @@ A demo microservices system built with Java 17, Spring Boot 3.x, Eureka service 
 
 - Service discovery via Eureka
 - API gateway routing (single entrypoint)
-- Postgres persistence for user/restaurant/order services (one Postgres container, separate DB per service)
+- Postgres persistence for user/restaurant/order/delivery services (one Postgres container, separate DB per service)
 - Order workflow:
   - create order (PENDING)
   - pay order -> status becomes PAID or FAILED
+- Delivery service (skeleton): browse deliveries and fetch a delivery by id
 - Input validation and consistent 400 responses for invalid payloads
 
 ## Services
@@ -20,6 +21,7 @@ A demo microservices system built with Java 17, Spring Boot 3.x, Eureka service 
 - **restaurant-service**: manages restaurants (`/restaurants/**`)
 - **order-service**: handles orders + pay workflow (`/orders/**`)
 - **payment-service**: simulates payments (`/payments/**`)
+- **delivery-service**: manages deliveries (`/deliveries/**`)
 
 ## Run locally (Docker)
 
@@ -57,6 +59,12 @@ curl -X POST http://localhost:8079/orders/1/pay \
 
 # Verify order status
 curl http://localhost:8079/orders/1
+
+# Browse deliveries
+curl http://localhost:8079/deliveries
+
+# Get delivery by ID
+curl http://localhost:8079/deliveries/1
 ```
 
 ## Databases
@@ -65,6 +73,7 @@ A single Postgres container is started. Each DB-backed service uses its own data
 - user-service -> `userdb`
 - restaurant-service -> `restaurantdb`
 - order-service -> `orderdb`
+- delivery-service -> `deliverydb`
 
 The Postgres container creates these DBs on first start via `postgres/init.sql`.
 
