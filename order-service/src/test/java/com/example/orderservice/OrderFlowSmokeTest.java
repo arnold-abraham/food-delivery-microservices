@@ -1,50 +1,44 @@
 package com.example.orderservice;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.boot.web.client.RestTemplateBuilder;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.Map;
-
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest
+@AutoConfigureMockMvc
 @ActiveProfiles("test")
 class OrderFlowSmokeTest {
 
     @Autowired
-    TestRestTemplate http;
+    MockMvc mvc;
 
     @Autowired
+    RestTemplate restTemplate;
+
     MockRestServiceServer mockServer;
 
-    @TestConfiguration
-    static class Config {
-        @Bean
-        @Primary
-        RestTemplate restTemplate(RestTemplateBuilder builder) {
-            return builder.build();
-        }
-
-        @Bean
-        MockRestServiceServer mockRestServiceServer(RestTemplate restTemplate) {
-            return MockRestServiceServer.createServer(restTemplate);
-        }
+    @BeforeEach
+    void setup() {
+        mockServer = MockRestServiceServer.createServer(restTemplate);
     }
 
     @Test
-    void createOrderWithItems_payAndAssignDelivery() {
+    void createOrderWithItems_payAndAssignDelivery() throws Exception {
         // restaurant-service: menu item lookup
         mockServer.expect(requestTo("http://localhost/restaurants/1/menu/10"))
                 .andExpect(method(org.springframework.http.HttpMethod.GET))
@@ -66,26 +60,27 @@ class OrderFlowSmokeTest {
                 .andRespond(withSuccess("{\"id\":99,\"orderId\":1,\"driverId\":5,\"status\":\"ASSIGNED\"}", MediaType.APPLICATION_JSON));
 
         // Create order with items
-        Map<String, Object> createReq = Map.of(
-                "userId", 2,
-                "restaurantId", 1,
-                "items", new Object[]{Map.of("menuItemId", 10, "quantity", 2)}
-        );
+        String createJson = "{\"userId\":2,\"restaurantId\":1,\"items\":[{\"menuItemId\":10,\"quantity\":2}]}";
 
-        var created = http.postForEntity("/orders", createReq, Map.class);
-        assertThat(created.getStatusCode().is2xxSuccessful()).isTrue();
-        assertThat(created.getBody()).isNotNull();
-        assertThat(((Number) created.getBody().get("totalAmount")).doubleValue()).isEqualTo(24.0);
+        String createdBody = mvc.perform(post("/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalAmount").value(24.0))
+                .andReturn().getResponse().getContentAsString();
 
-        Number orderId = (Number) created.getBody().get("id");
+        // Extract orderId without adding extra deps
+        long orderId = Long.parseLong(createdBody.replaceAll("(?s).*\"id\"\\s*:\\s*(\\d+).*", "$1"));
+        assertThat(orderId).isGreaterThan(0);
 
         // Pay order
-        Map<String, Object> payReq = Map.of("amount", 24, "driverId", 5);
-        var paid = http.postForEntity("/orders/" + orderId + "/pay", payReq, Map.class);
-        assertThat(paid.getStatusCode().is2xxSuccessful()).isTrue();
-        assertThat(paid.getBody()).isNotNull();
-        assertThat(String.valueOf(paid.getBody().get("status"))).isEqualTo("PAID");
-        assertThat(String.valueOf(paid.getBody().get("deliveryStatus"))).isEqualTo("ASSIGNED");
+        String payJson = "{\"amount\":24,\"driverId\":5}";
+        mvc.perform(post("/orders/" + orderId + "/pay")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PAID"))
+                .andExpect(jsonPath("$.deliveryStatus").value("ASSIGNED"));
 
         mockServer.verify();
     }

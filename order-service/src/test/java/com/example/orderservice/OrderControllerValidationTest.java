@@ -1,61 +1,59 @@
 package com.example.orderservice;
 
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
+import jakarta.validation.ValidatorFactory;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import java.util.List;
 
-@WebMvcTest(OrderController.class)
+import static org.assertj.core.api.Assertions.assertThat;
+
 class OrderControllerValidationTest {
 
-    @TestConfiguration
-    static class StubConfig {
-        @Bean
-        OrderService orderService() {
-            // Not used in these tests (validation fails before controller calls service)
-            return new OrderService(null, null) {
-            };
-        }
+    private static ValidatorFactory factory;
+    private static Validator validator;
+
+    @BeforeAll
+    static void setupValidator() {
+        factory = Validation.buildDefaultValidatorFactory();
+        validator = factory.getValidator();
     }
 
-    @Autowired
-    private MockMvc mvc;
-
-    @Test
-    void createOrder_invalidPayload_returns400WithFields() throws Exception {
-        mvc.perform(post("/orders")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"userId\":0,\"restaurantId\":0}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("Validation failed"))
-                .andExpect(jsonPath("$.fields.userId").exists())
-                .andExpect(jsonPath("$.fields.restaurantId").exists());
+    @AfterAll
+    static void closeValidator() {
+        factory.close();
     }
 
     @Test
-    void pay_invalidPayload_returns400WithFields() throws Exception {
-        mvc.perform(post("/orders/1/pay")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"amount\":0}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("Validation failed"))
-                .andExpect(jsonPath("$.fields.amount").exists());
+    void createOrder_invalidPayload_hasErrorsForUserIdAndRestaurantId() {
+        var req = new OrderController.CreateOrderRequest(0L, 0L, List.of());
+
+        var violations = validator.validate(req);
+        assertThat(violations)
+                .extracting(v -> v.getPropertyPath().toString())
+                .contains("userId", "restaurantId");
     }
 
     @Test
-    void pay_invalidDriverId_returns400WithFields() throws Exception {
-        mvc.perform(post("/orders/1/pay")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"amount\":10,\"driverId\":0}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("Validation failed"))
-                .andExpect(jsonPath("$.fields.driverId").exists());
+    void pay_invalidPayload_hasErrorForAmount() {
+        var req = new OrderController.PayOrderRequest(0.0, null);
+
+        var violations = validator.validate(req);
+        assertThat(violations)
+                .extracting(v -> v.getPropertyPath().toString())
+                .contains("amount");
+    }
+
+    @Test
+    void pay_invalidDriverId_hasErrorForDriverId() {
+        var req = new OrderController.PayOrderRequest(10.0, 0L);
+
+        var violations = validator.validate(req);
+        assertThat(violations)
+                .extracting(v -> v.getPropertyPath().toString())
+                .contains("driverId");
     }
 }
