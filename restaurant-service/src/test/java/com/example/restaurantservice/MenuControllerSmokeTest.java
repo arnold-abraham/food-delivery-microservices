@@ -34,6 +34,11 @@ class MenuControllerSmokeTest {
 
         long restaurantId = mapper.readTree(restaurantJson).get("id").asLong();
 
+        mvc.perform(get("/restaurants?cuisine=Italian"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").isNumber())
+                .andExpect(jsonPath("$[0].cuisine").value("Italian"));
+
         mvc.perform(post("/restaurants/" + restaurantId + "/menu")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"Pizza\",\"price\":12}"))
@@ -47,4 +52,3 @@ class MenuControllerSmokeTest {
                 .andExpect(jsonPath("$[0].name").value("Pizza"));
     }
 }
-
