@@ -15,5 +15,7 @@ public class RestaurantService {
     public Restaurant create(String name, String cuisine) { return repository.save(new Restaurant(name, cuisine)); }
     public Optional<Restaurant> get(Long id) { return repository.findById(id); }
     public List<Restaurant> list() { return repository.findAll(); }
+    public List<Restaurant> listByCuisine(String cuisine) {
+        return repository.findByCuisineIgnoreCase(cuisine);
+    }
 }
-

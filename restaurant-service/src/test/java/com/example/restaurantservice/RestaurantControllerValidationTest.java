@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -37,5 +38,12 @@ class RestaurantControllerValidationTest {
                 .andExpect(jsonPath("$.error").value("Validation failed"))
                 .andExpect(jsonPath("$.fields.name").exists())
                 .andExpect(jsonPath("$.fields.cuisine").exists());
+    }
+
+    @Test
+    void listRestaurants_missingCuisine_returns400() throws Exception {
+        mvc.perform(get("/restaurants"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("cuisine query param is required"));
     }
 }

@@ -17,6 +17,12 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
+security:
+  jwt:
+    # Base64-encoded secret. Override in docker-compose for real usage.
+    secret: ${JWT_SECRET:ZGV2LXNlY3JldC1zaG91bGQtYmUtcmVwbGFjZWQtYXQtcnVudGltZQ==}
+    ttl-seconds: ${JWT_TTL_SECONDS:3600}
+
 # Eureka service discovery
 eureka:
   client:

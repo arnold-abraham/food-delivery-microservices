@@ -56,8 +56,15 @@ public class DeliveryController {
 
     @PatchMapping("/{id}/status")
     public ResponseEntity<?> updateStatus(@PathVariable Long id, @Valid @RequestBody UpdateDeliveryStatusRequest req) {
-        return service.updateStatus(id, req.status())
-                .<ResponseEntity<?>>map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.status(404).body(Map.of("error", "Delivery not found")));
+        try {
+            return service.updateStatus(id, req.status())
+                    .<ResponseEntity<?>>map(ResponseEntity::ok)
+                    .orElseGet(() -> ResponseEntity.status(404).body(Map.of("error", "Delivery not found")));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        } catch (IllegalStateException ex) {
+            // invalid transition
+            return ResponseEntity.status(409).body(Map.of("error", ex.getMessage()));
+        }
     }
 }

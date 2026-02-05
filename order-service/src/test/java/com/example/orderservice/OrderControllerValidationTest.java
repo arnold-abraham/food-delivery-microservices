@@ -38,6 +38,20 @@ class OrderControllerValidationTest {
     }
 
     @Test
+    void createOrder_invalidItems_hasErrorsForMenuItemIdAndQuantity() {
+        var req = new OrderController.CreateOrderRequest(
+                1L,
+                1L,
+                List.of(new OrderController.CreateOrderItemRequest(0L, 0))
+        );
+
+        var violations = validator.validate(req);
+        assertThat(violations)
+                .extracting(v -> v.getPropertyPath().toString())
+                .contains("items[0].menuItemId", "items[0].quantity");
+    }
+
+    @Test
     void pay_invalidPayload_hasErrorForAmount() {
         var req = new OrderController.PayOrderRequest(0.0, null);
 

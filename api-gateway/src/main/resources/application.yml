@@ -6,6 +6,12 @@ spring:
     web-application-type: reactive
   application:
     name: api-gateway
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Use the same secret as user-service (HS256). Override via env var.
+          secret: ${JWT_SECRET:ZGV2LXNlY3JldC1zaG91bGQtYmUtcmVwbGFjZWQtYXQtcnVudGltZQ==}
   cloud:
     gateway:
       # Allow browser access (dev-friendly). Tighten for production.
@@ -24,6 +30,10 @@ spring:
             allowedHeaders:
               - "*"
       routes:
+        - id: auth
+          uri: lb://user-service
+          predicates:
+            - Path=/auth/**
         - id: user-service
           uri: lb://user-service
           predicates:

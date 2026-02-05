@@ -14,14 +14,19 @@ import java.util.Map;
 public class OrderController {
 
     public record CreateOrderItemRequest(
-            @NotNull(message = "menuItemId is required") @Min(value = 1, message = "menuItemId must be >= 1") Long menuItemId,
-            @Min(value = 1, message = "quantity must be >= 1") int quantity
+            @NotNull(message = "menuItemId is required")
+            @Min(value = 1, message = "menuItemId must be >= 1")
+            Long menuItemId,
+
+            @NotNull(message = "quantity is required")
+            @Min(value = 1, message = "quantity must be >= 1")
+            Integer quantity
     ) {}
 
     public record CreateOrderRequest(
             @NotNull(message = "userId is required") @Min(value = 1, message = "userId must be >= 1") Long userId,
             @NotNull(message = "restaurantId is required") @Min(value = 1, message = "restaurantId must be >= 1") Long restaurantId,
-            List<CreateOrderItemRequest> items
+            @Valid List<CreateOrderItemRequest> items
     ) {}
 
     public record PayOrderRequest(
