@@ -23,6 +23,7 @@
     </properties>
 
     <modules>
+        <module>contracts</module>
         <module>service-discovery</module>
         <module>api-gateway</module>
         <module>user-service</module>

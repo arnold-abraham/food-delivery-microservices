@@ -13,6 +13,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureWebTestClient
+@org.springframework.test.context.ActiveProfiles("test") // Ensure Eureka/discovery are disabled for unit tests
 class GatewayAuthEnforcementTest {
 
     @Autowired
@@ -24,6 +25,25 @@ class GatewayAuthEnforcementTest {
                 .uri("/health")
                 .exchange()
                 .expectStatus().isOk();
+    }
+
+    @Test
+    void health_includesCorrelationIdHeader() {
+        webTestClient.get()
+                .uri("/health")
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().exists("X-Correlation-Id");
+    }
+
+    @Test
+    void health_echoesProvidedCorrelationIdHeader() {
+        webTestClient.get()
+                .uri("/health")
+                .header("X-Correlation-Id", "test-corr-123")
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().valueEquals("X-Correlation-Id", "test-corr-123");
     }
 
     @Test

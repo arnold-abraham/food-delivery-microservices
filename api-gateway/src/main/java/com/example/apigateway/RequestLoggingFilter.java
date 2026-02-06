@@ -20,6 +20,7 @@ public class RequestLoggingFilter implements GlobalFilter, Ordered {
         ServerHttpRequest req = exchange.getRequest();
         String method = req.getMethod() != null ? req.getMethod().name() : "";
         String path = req.getURI().getPath();
+        String correlationId = req.getHeaders().getFirst("X-Correlation-Id");
 
         long start = System.currentTimeMillis();
         return chain.filter(exchange)
@@ -28,7 +29,11 @@ public class RequestLoggingFilter implements GlobalFilter, Ordered {
                             ? exchange.getResponse().getStatusCode().value()
                             : 0;
                     long tookMs = System.currentTimeMillis() - start;
-                    log.info("{} {} -> {} ({}ms)", method, path, status, tookMs);
+                    if (correlationId != null && !correlationId.isBlank()) {
+                        log.info("{} {} -> {} ({}ms) corrId={}", method, path, status, tookMs, correlationId);
+                    } else {
+                        log.info("{} {} -> {} ({}ms)", method, path, status, tookMs);
+                    }
                 });
     }
 
@@ -37,4 +42,3 @@ public class RequestLoggingFilter implements GlobalFilter, Ordered {
         return -1; // run early
     }
 }
-
