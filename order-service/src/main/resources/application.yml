@@ -4,6 +4,17 @@ server:
 spring:
   application:
     name: order-service
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    consumer:
+      group-id: order-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: com.example.contracts.events
+        spring.json.use.type.headers: false
+        spring.json.value.default.type: com.example.contracts.events.DeliveryStatusChangedEvent
   datasource:
     url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:orderdb}
     username: ${DB_USER:food}

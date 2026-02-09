@@ -1,5 +1,7 @@
 package com.example.deliveryservice;
 
+import com.example.deliveryservice.http.CorrelationIdHolder;
+import com.example.deliveryservice.kafka.DeliveryEventsPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -10,9 +12,11 @@ import java.util.Optional;
 public class DeliveryService {
 
     private final DeliveryRepository repository;
+    private final DeliveryEventsPublisher eventsPublisher;
 
-    public DeliveryService(DeliveryRepository repository) {
+    public DeliveryService(DeliveryRepository repository, DeliveryEventsPublisher eventsPublisher) {
         this.repository = repository;
+        this.eventsPublisher = eventsPublisher;
     }
 
     public Optional<Delivery> get(Long id) {
@@ -43,7 +47,16 @@ public class DeliveryService {
                 throw new IllegalStateException("Invalid delivery status transition: " + current + " -> " + next);
             }
             d.setStatus(next.name());
-            return repository.save(d);
+            Delivery saved = repository.save(d);
+
+            // best-effort event publish (avoid failing user request if Kafka is temporarily down)
+            try {
+                eventsPublisher.publishStatusChanged(saved.getId(), saved.getOrderId(), saved.getStatus(), CorrelationIdHolder.currentOrNull());
+            } catch (Exception ex) {
+                // swallow; delivery status is already persisted
+            }
+
+            return saved;
         });
     }
 
