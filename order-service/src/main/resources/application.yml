@@ -6,6 +6,11 @@ spring:
     name: order-service
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
     consumer:
       group-id: order-service
       auto-offset-reset: earliest
@@ -28,15 +33,21 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
-# Eureka service discovery
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
 eureka:
   client:
     service-url:
-      defaultZone: ${EUREKA_URL:http://service-discovery:8761/eureka/}
+      defaultZone: http://service-discovery:8761/eureka/
+  instance:
+    prefer-ip-address: true
 
-# Upstream service URLs (overridable via env vars)
 order:
-  payment-service-url: ${PAYMENT_SERVICE_URL:http://payment-service:8084}
-  delivery-service-url: ${DELIVERY_SERVICE_URL:http://delivery-service:8086}
-  user-service-url: ${USER_SERVICE_URL:http://user-service:8081}
-  restaurant-service-url: ${RESTAURANT_SERVICE_URL:http://restaurant-service:8082}
+  payment-service-url: http://payment-service:8084
+  delivery-service-url: http://delivery-service:8086
+  user-service-url: http://user-service:8081
+  restaurant-service-url: http://restaurant-service:8082
