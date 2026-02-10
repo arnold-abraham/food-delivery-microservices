@@ -1,12 +1,13 @@
 # Food Delivery Microservices
 
-A microservices system built with Java 17, Spring Boot 3.x, Eureka service discovery, and Spring Cloud Gateway.
+Java 17 + Spring Boot microservices with Eureka, Spring Cloud Gateway, Postgres, and Kafka event publishing.
 
-## What’s included (base version)
+## What’s included
 
 - Service discovery via Eureka
 - API gateway routing (single entrypoint)
 - Postgres persistence for user/restaurant/order/delivery services (one Postgres container, separate DB per service)
+- Kafka events for key lifecycle updates (order/payment/delivery)
 - End-to-end flow:
   - user registration + JWT login
   - create menu items
@@ -20,25 +21,21 @@ A microservices system built with Java 17, Spring Boot 3.x, Eureka service disco
 - **service-discovery**: Eureka server for service registry (http://localhost:8761)
 - **api-gateway**: Spring Cloud Gateway as single entrypoint (http://localhost:8079)
 - **user-service**: manages users (`/users/**`, `/auth/**`)
-- **restaurant-service**: manages menu items (`/restaurants/**`)
+- **restaurant-service**: manages restaurants + menu items (`/restaurants/**`)
 - **order-service**: orders + pay workflow (`/orders/**`)
 - **payment-service**: validates payments (`/payments/**`)
 - **delivery-service**: delivery assignments + status updates (`/deliveries/**`)
 
-## Run locally (Docker)
+## Run (Docker)
 
 ```bash
 mvn -DskipTests clean package
 docker compose up --build
 ```
 
-Open:
-- Eureka dashboard: http://localhost:8761
-- Gateway: http://localhost:8079
+## Auth (JWT)
 
-## Authentication (JWT)
-
-Register + login to get a JWT, then pass it via `Authorization: Bearer <token>`.
+Register + login, then call APIs with `Authorization: Bearer <token>`.
 
 ```bash
 curl -X POST http://localhost:8079/auth/register \
@@ -48,42 +45,6 @@ curl -X POST http://localhost:8079/auth/register \
 curl -X POST http://localhost:8079/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"alice@example.com","password":"pass1234"}'
-```
-
-## Demo flow
-
-A runnable end-to-end flow script is included:
-
-```bash
-./scripts/demo-flow.sh
-```
-
-## Databases
-
-A single Postgres container is started. Each DB-backed service uses its own database:
-- user-service -> `userdb`
-- restaurant-service -> `restaurantdb`
-- order-service -> `orderdb`
-- delivery-service -> `deliverydb`
-
-The Postgres container creates these DBs on first start via `postgres/init.sql`.
-
-### Connection details
-
-- From inside Docker network:
-  - host: `postgres`
-  - port: `5432`
-  - user: `food`
-  - password: `food`
-
-- From your host machine:
-  - host: `localhost`
-  - port: `5433` (mapped in `docker-compose.yml`)
-
-Example:
-
-```bash
-psql "postgresql://food:food@localhost:5433/userdb"
 ```
 
 ## Architecture
