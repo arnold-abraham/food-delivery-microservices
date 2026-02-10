@@ -38,5 +38,11 @@
                 <scope>test</scope>
             </dependency>
 
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>contracts</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         </dependencies>
     </project>

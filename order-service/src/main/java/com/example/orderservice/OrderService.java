@@ -1,5 +1,6 @@
 package com.example.orderservice;
 
+import com.example.orderservice.kafka.OrderEventsPublisher;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -7,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -16,6 +18,7 @@ public class OrderService {
     private final OrderRepository repository;
     private final OrderItemRepository orderItemRepository;
     private final RestTemplate restTemplate;
+    private final OrderEventsPublisher eventsPublisher;
 
     @Value("${order.payment-service-url:http://payment-service:8084}")
     private String paymentServiceBaseUrl;
@@ -29,10 +32,14 @@ public class OrderService {
     @Value("${order.restaurant-service-url:http://restaurant-service:8082}")
     private String restaurantServiceBaseUrl;
 
-    public OrderService(OrderRepository repository, OrderItemRepository orderItemRepository, RestTemplate restTemplate) {
+    public OrderService(OrderRepository repository,
+                        OrderItemRepository orderItemRepository,
+                        RestTemplate restTemplate,
+                        OrderEventsPublisher eventsPublisher) {
         this.repository = repository;
         this.orderItemRepository = orderItemRepository;
         this.restTemplate = restTemplate;
+        this.eventsPublisher = eventsPublisher;
     }
 
     @Transactional
@@ -60,7 +67,16 @@ public class OrderService {
         }
 
         order.setTotalAmount(total);
-        return repository.save(order);
+        Order saved = repository.save(order);
+
+        // best-effort event publish (avoid failing user request if Kafka is temporarily down)
+        try {
+            eventsPublisher.publishOrderPlaced(saved.getId(), saved.getUserId(), saved.getRestaurantId());
+        } catch (Exception ignored) {
+            // swallow
+        }
+
+        return saved;
     }
 
     @Transactional
@@ -84,6 +100,15 @@ public class OrderService {
     public Optional<Order> pay(Long orderId, double amount, Long driverId) {
         return repository.findById(orderId).map(order -> {
             double expectedAmount = order.getTotalAmount() != null ? order.getTotalAmount() : 0.0;
+            BigDecimal amountBd = BigDecimal.valueOf(amount);
+            BigDecimal expectedBd = BigDecimal.valueOf(expectedAmount);
+
+            // best-effort: payment requested event
+            try {
+                eventsPublisher.publishPaymentRequested(order.getId(), amountBd, expectedBd);
+            } catch (Exception ignored) {
+                // swallow
+            }
 
             // Call payment-service (exact amount validation via expectedAmount)
             String paymentUrl = paymentServiceBaseUrl + "/payments";
@@ -96,6 +121,13 @@ public class OrderService {
             Map<?, ?> paymentResponse = restTemplate.postForObject(paymentUrl, paymentRequest, Map.class);
             boolean paymentSuccess = paymentResponse != null &&
                     "SUCCESS".equalsIgnoreCase(String.valueOf(paymentResponse.get("status")));
+
+            // best-effort: payment completed event
+            try {
+                eventsPublisher.publishPaymentCompleted(order.getId(), amountBd, expectedBd, paymentSuccess ? "SUCCESS" : "FAILED");
+            } catch (Exception ignored) {
+                // swallow
+            }
 
             String newStatus = paymentSuccess ? "PAID" : "FAILED";
             order.setStatus(newStatus);
@@ -122,6 +154,16 @@ public class OrderService {
                         "driverId", effectiveDriverId
                 );
                 Map<?, ?> delivery = restTemplate.postForObject(deliveryUrl, deliveryRequest, Map.class);
+
+                // best-effort: publish rider assigned event
+                try {
+                    if (delivery != null && delivery.get("id") != null) {
+                        long deliveryId = Long.parseLong(String.valueOf(delivery.get("id")));
+                        eventsPublisher.publishRiderAssigned(saved.getId(), deliveryId, effectiveDriverId);
+                    }
+                } catch (Exception ignored) {
+                    // swallow
+                }
 
                 // Store initial delivery status (best-effort)
                 if (delivery != null && delivery.get("status") != null) {
