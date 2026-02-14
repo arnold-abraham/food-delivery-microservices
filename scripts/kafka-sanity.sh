@@ -1,46 +1,66 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Lightweight helper for local Kafka verification.
-# - Lists topics
-# - Starts two consumers (order placed + delivery status changed)
-#
-# Usage:
-#   ./scripts/kafka-sanity.sh
-#
-# Stop:
-#   Ctrl+C
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
 
-BOOTSTRAP_SERVER=${BOOTSTRAP_SERVER:-kafka:9092}
+# Use the host listener so the script works from your laptop terminal.
+# (Inside containers, services use kafka:9092 via KAFKA_BOOTSTRAP_SERVERS.)
+BOOTSTRAP="${KAFKA_BOOTSTRAP_SERVERS:-localhost:19092}"
 
-echo "== Topics (bootstrap: ${BOOTSTRAP_SERVER}) =="
-docker compose exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server "${BOOTSTRAP_SERVER}" --list
+TOPICS=(
+  "order.placed.v1"
+  "payment.requested.v1"
+  "payment.completed.v1"
+  "rider.assigned.v1"
+  "delivery.status.changed.v1"
+)
+
+echo "== Ensuring topics exist (bootstrap: $BOOTSTRAP) =="
+for t in "${TOPICS[@]}"; do
+  docker compose exec -T kafka /opt/kafka/bin/kafka-topics.sh \
+    --bootstrap-server "$BOOTSTRAP" \
+    --create --if-not-exists \
+    --topic "$t" \
+    --partitions 1 \
+    --replication-factor 1 >/dev/null 2>&1 || true
+done
+
+echo "== Topics =="
+docker compose exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --list | sort
 
 echo
 echo "== Starting consumers (Ctrl+C to stop) =="
-echo "- order.placed.v1"
-echo "- delivery.status.changed.v1"
+for t in "${TOPICS[@]}"; do
+  echo "- $t"
+done
+
 echo
+echo "Tip: run ./scripts/demo-flow.sh in another terminal to generate events."
 
-# Run consumers in background and wait.
-docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh \
-  --bootstrap-server "${BOOTSTRAP_SERVER}" \
-  --topic order.placed.v1 \
-  --from-beginning \
-  --property print.timestamp=true &
-PID1=$!
+# Important: use a single-quoted heredoc so $1 isn't expanded by the *outer* shell (set -u would fail).
+docker compose exec -T kafka bash -s <<'KAFKA_SH'
+set -euo pipefail
 
-docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh \
-  --bootstrap-server "${BOOTSTRAP_SERVER}" \
-  --topic delivery.status.changed.v1 \
-  --from-beginning \
-  --property print.timestamp=true &
-PID2=$!
+BOOTSTRAP="${KAFKA_BOOTSTRAP_SERVERS:-localhost:19092}"
 
-cleanup() {
-  kill ${PID1} ${PID2} 2>/dev/null || true
+consumer() {
+  local topic="$1"
+  /opt/kafka/bin/kafka-console-consumer.sh \
+    --bootstrap-server "$BOOTSTRAP" \
+    --topic "$topic" \
+    --from-beginning \
+    --property print.timestamp=true \
+    --property print.key=true \
+    --timeout-ms 600000 \
+    | cat
 }
-trap cleanup EXIT
+
+consumer 'order.placed.v1' &
+consumer 'payment.requested.v1' &
+consumer 'payment.completed.v1' &
+consumer 'rider.assigned.v1' &
+consumer 'delivery.status.changed.v1' &
 
 wait
-
+KAFKA_SH

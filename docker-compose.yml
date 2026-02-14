@@ -18,7 +18,8 @@ services:
   kafka:
     image: apache/kafka:3.7.0
     ports:
-      - "9092:19092"
+      # Host access (optional): localhost:19092
+      - "19092:19092"
     environment:
       # KRaft single-node
       - KAFKA_NODE_ID=1
@@ -83,26 +84,52 @@ services:
 
   order-service:
     build: ./order-service
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     depends_on:
       service-discovery:
         condition: service_healthy
       postgres:
         condition: service_healthy
       kafka:
-        condition: service_started
+        condition: service_healthy
 
   payment-service:
     build: ./payment-service
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     depends_on:
       service-discovery:
         condition: service_healthy
 
   delivery-service:
     build: ./delivery-service
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     depends_on:
       service-discovery:
         condition: service_healthy
       postgres:
         condition: service_healthy
       kafka:
-        condition: service_started
+        condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:v2.51.2
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus

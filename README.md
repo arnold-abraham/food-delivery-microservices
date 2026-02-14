@@ -1,6 +1,6 @@
 # Food Delivery Microservices
 
-Java 17 + Spring Boot microservices with Eureka, Spring Cloud Gateway, Postgres, and Kafka event publishing.
+Java 17 + Spring Boot microservices with Eureka, Spring Cloud Gateway, Postgres, Kafka events, and JWT auth.
 
 ## What’s included
 
@@ -18,13 +18,13 @@ Java 17 + Spring Boot microservices with Eureka, Spring Cloud Gateway, Postgres,
 
 ## Services
 
-- **service-discovery**: Eureka server for service registry (http://localhost:8761)
-- **api-gateway**: Spring Cloud Gateway as single entrypoint (http://localhost:8079)
-- **user-service**: manages users (`/users/**`, `/auth/**`)
-- **restaurant-service**: manages restaurants + menu items (`/restaurants/**`)
-- **order-service**: orders + pay workflow (`/orders/**`)
-- **payment-service**: validates payments (`/payments/**`)
-- **delivery-service**: delivery assignments + status updates (`/deliveries/**`)
+- **service-discovery**: Eureka server (http://localhost:8761)
+- **api-gateway**: single entrypoint (http://localhost:8079)
+- **user-service**: users + auth (`/users/**`, `/auth/**`)
+- **restaurant-service**: restaurants + menu (`/restaurants/**`)
+- **order-service**: orders + pay (`/orders/**`)
+- **payment-service**: payments (`/payments/**`)
+- **delivery-service**: deliveries (`/deliveries/**`)
 
 ## Run (Docker)
 
@@ -35,17 +35,18 @@ docker compose up --build
 
 ## Auth (JWT)
 
-Register + login, then call APIs with `Authorization: Bearer <token>`.
+Most endpoints are protected. Obtain a token via `/auth/register` and `/auth/login`, then pass:
 
-```bash
-curl -X POST http://localhost:8079/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Alice","email":"alice@example.com","password":"pass1234","roles":"CUSTOMER"}'
+- `Authorization: Bearer <token>`
 
-curl -X POST http://localhost:8079/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"alice@example.com","password":"pass1234"}'
-```
+## Kafka
+
+Kafka runs via Docker Compose. See `scripts/kafka-sanity.sh` for a quick local topic/consumer demo.
+
+## Observability
+
+- Prometheus: http://localhost:9090
+- Grafana: http://localhost:3000 (admin/admin)
 
 ## Architecture
 

@@ -19,13 +19,17 @@ public class GatewaySecurityConfig {
                         // gateway 자체 endpoints
                         .pathMatchers("/", "/health", "/info").permitAll()
 
+                        // Prometheus scraping + actuator endpoints (no auth)
+                        .pathMatchers("/actuator/**").permitAll()
+
                         // auth endpoints live in user-service behind gateway routing
                         .pathMatchers(HttpMethod.POST, "/auth/register", "/auth/login").permitAll()
 
                         // Everything else requires a valid JWT
                         .anyExchange().authenticated()
                 )
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}));
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {
+                }));
 
         return http.build();
     }

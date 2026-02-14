@@ -13,7 +13,6 @@ spring:
     listener:
       auto-startup: false
 
-# Disable Eureka during tests
 eureka:
   client:
     enabled: false
