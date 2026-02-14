@@ -11,10 +11,16 @@ set -euo pipefail
 # Stop:
 #   Ctrl+C
 
+# NOTE:
+# - We run kafka CLI tools *inside* the kafka container.
+# - docker compose exec allocates a TTY by default, which fails in some shells/CI.
+#   Use -T to disable TTY.
+
 BOOTSTRAP_SERVER=${BOOTSTRAP_SERVER:-kafka:9092}
+EXEC=(docker compose exec -T kafka)
 
 echo "== Topics (bootstrap: ${BOOTSTRAP_SERVER}) =="
-docker compose exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server "${BOOTSTRAP_SERVER}" --list
+"${EXEC[@]}" /opt/kafka/bin/kafka-topics.sh --bootstrap-server "${BOOTSTRAP_SERVER}" --list || true
 
 echo
 echo "== Starting consumers (Ctrl+C to stop) =="
@@ -23,14 +29,14 @@ echo "- delivery.status.changed.v1"
 echo
 
 # Run consumers in background and wait.
-docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh \
+"${EXEC[@]}" /opt/kafka/bin/kafka-console-consumer.sh \
   --bootstrap-server "${BOOTSTRAP_SERVER}" \
   --topic order.placed.v1 \
   --from-beginning \
   --property print.timestamp=true &
 PID1=$!
 
-docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh \
+"${EXEC[@]}" /opt/kafka/bin/kafka-console-consumer.sh \
   --bootstrap-server "${BOOTSTRAP_SERVER}" \
   --topic delivery.status.changed.v1 \
   --from-beginning \
@@ -43,4 +49,3 @@ cleanup() {
 trap cleanup EXIT
 
 wait
-
