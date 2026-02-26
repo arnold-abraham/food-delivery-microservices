@@ -33,6 +33,61 @@ mvn -DskipTests clean package
 docker compose up --build
 ```
 
+## Run (Kubernetes / Minikube)
+
+This repo includes a baseline Kubernetes setup in `k8s/`:
+
+- **No Eureka**: services talk via Kubernetes DNS (`http://order-service:8083`, etc.) using `ClusterIP` Services.
+- **Only the API Gateway is exposed**: via an Ingress.
+- **Postgres and Kafka are StatefulSets** with PVCs for persistence.
+- **Config is externalized** via ConfigMaps and Secrets.
+
+### Prereqs
+
+- `minikube`, `kubectl`
+- An Ingress controller (on Minikube, the built-in addon works)
+
+### Build images for Minikube
+
+If your Minikube uses its own Docker daemon, you’ll typically do:
+
+```bash
+eval $(minikube -p minikube docker-env)
+```
+
+Then build the service images (tags match the manifests):
+
+```bash
+docker build -t api-gateway:0.0.1-SNAPSHOT ./api-gateway
+docker build -t user-service:0.0.1-SNAPSHOT ./user-service
+docker build -t restaurant-service:0.0.1-SNAPSHOT ./restaurant-service
+docker build -t order-service:0.0.1-SNAPSHOT ./order-service
+docker build -t payment-service:0.0.1-SNAPSHOT ./payment-service
+docker build -t delivery-service:0.0.1-SNAPSHOT ./delivery-service
+```
+
+### Deploy
+
+```bash
+kubectl apply -f k8s/
+```
+
+Enable ingress on Minikube:
+
+```bash
+minikube addons enable ingress
+```
+
+Then access the Gateway through the Minikube ingress IP (or `minikube tunnel` depending on driver):
+
+```bash
+minikube ip
+```
+
+### Optional: Autoscaling
+
+`k8s/40-order-hpa.yaml` includes an HPA for `order-service` (requires metrics-server in your cluster).
+
 ## Auth (JWT)
 
 Most endpoints are protected. Obtain a token via `/auth/register` and `/auth/login`, then pass:
