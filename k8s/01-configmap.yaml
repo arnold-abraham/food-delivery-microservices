@@ -1,11 +1,10 @@
 apiVersion: v1
-
+kind: ConfigMap
+metadata:
+  name: food-config
+  namespace: food
+data:
   JWT_TTL_SECONDS: "3600"
   KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
   DB_PORT: "5432"
   DB_HOST: "postgres"
-data:
-  namespace: food
-  name: food-config
-metadata:
-kind: ConfigMap

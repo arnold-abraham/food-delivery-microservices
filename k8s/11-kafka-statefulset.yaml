@@ -11,13 +11,32 @@ spec:
   selector:
     app: kafka
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-headless
+  namespace: food
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app: kafka
+  ports:
+    - name: kafka
+      port: 9092
+      targetPort: 9092
+    - name: controller
+      port: 9093
+      targetPort: 9093
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: kafka
   namespace: food
 spec:
-  serviceName: kafka
+  # Headless service gives stable pod DNS: kafka-0.kafka-headless.food.svc.cluster.local
+  serviceName: kafka-headless
   replicas: 1
   selector:
     matchLabels:
@@ -36,24 +55,33 @@ spec:
             - containerPort: 9093
               name: controller
           env:
+            # apache/kafka official image expects KAFKA_* env vars (not KAFKA_CFG_*).
+            # Run in KRaft mode (no ZooKeeper).
             - name: KAFKA_NODE_ID
               value: "1"
             - name: KAFKA_PROCESS_ROLES
               value: "broker,controller"
             - name: KAFKA_CONTROLLER_QUORUM_VOTERS
-              value: "1@kafka-0.kafka.food.svc.cluster.local:9093"
+              value: "1@kafka-0.kafka-headless.food.svc.cluster.local:9093"
 
+            # Listeners
             - name: KAFKA_LISTENERS
-              value: "INTERNAL://:9092,CONTROLLER://:9093"
+              value: "PLAINTEXT://:9092,CONTROLLER://:9093"
             - name: KAFKA_ADVERTISED_LISTENERS
-              value: "INTERNAL://kafka.food.svc.cluster.local:9092"
+              # Advertise the stable in-cluster service DNS (clients use kafka:9092)
+              value: "PLAINTEXT://kafka.food.svc.cluster.local:9092"
             - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
-              value: "INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT"
+              value: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
             - name: KAFKA_INTER_BROKER_LISTENER_NAME
-              value: "INTERNAL"
+              value: "PLAINTEXT"
             - name: KAFKA_CONTROLLER_LISTENER_NAMES
               value: "CONTROLLER"
 
+            # Persist Kafka logs to the PVC.
+            - name: KAFKA_LOG_DIRS
+              value: "/var/lib/kafka/data"
+
+            # Single-node defaults
             - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
               value: "true"
             - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
@@ -62,17 +90,36 @@ spec:
               value: "1"
             - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
               value: "1"
-          readinessProbe:
+          # Kafka can take a while to come up (esp. on Minikube). Let it initialize
+          # without being killed, then do functional probes.
+          startupProbe:
             exec:
-              command: ["sh", "-c", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
-            initialDelaySeconds: 20
+              command:
+                - sh
+                - -c
+                - "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"
             periodSeconds: 10
             timeoutSeconds: 10
-          livenessProbe:
-            tcpSocket:
-              port: 9092
-            initialDelaySeconds: 30
+            failureThreshold: 30
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"
             periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 12
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 6
           volumeMounts:
             - name: kafka-data
               mountPath: /var/lib/kafka/data
@@ -84,4 +131,3 @@ spec:
         resources:
           requests:
             storage: 2Gi
-

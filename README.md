@@ -1,11 +1,11 @@
 # Food Delivery Microservices
 
-Java 17 + Spring Boot microservices with Eureka, Spring Cloud Gateway, Postgres, Kafka events, and JWT auth.
+Java 17 + Spring Boot microservices with API Gateway, Postgres, Kafka events, and JWT auth.
 
 ## What’s included
 
-- Service discovery via Eureka
 - API gateway routing (single entrypoint)
+- DNS-based service discovery (Docker / Kubernetes)
 - Postgres persistence for user/restaurant/order/delivery services (one Postgres container, separate DB per service)
 - Kafka events for key lifecycle updates (order/payment/delivery)
 - End-to-end flow:
@@ -18,7 +18,6 @@ Java 17 + Spring Boot microservices with Eureka, Spring Cloud Gateway, Postgres,
 
 ## Services
 
-- **service-discovery**: Eureka server (http://localhost:8761)
 - **api-gateway**: single entrypoint (http://localhost:8079)
 - **user-service**: users + auth (`/users/**`, `/auth/**`)
 - **restaurant-service**: restaurants + menu (`/restaurants/**`)

@@ -23,12 +23,6 @@ security:
     secret: ${JWT_SECRET:ZGV2LXNlY3JldC1zaG91bGQtYmUtcmVwbGFjZWQtYXQtcnVudGltZQ==}
     ttl-seconds: ${JWT_TTL_SECONDS:3600}
 
-# Eureka service discovery
-eureka:
-  client:
-    service-url:
-      defaultZone: ${EUREKA_URL:http://service-discovery:8761/eureka/}
-
 management:
   endpoints:
     web:

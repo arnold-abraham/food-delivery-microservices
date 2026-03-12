@@ -11,11 +11,12 @@
     <name>food-delivery-microservices</name>
     <description>Food delivery microservices demo</description>
 
+    <!-- Inherit dependency management for Spring Boot starters -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
         <version>3.2.5</version>
-        <relativePath/> 
+        <relativePath/>
     </parent>
 
     <properties>
@@ -24,7 +25,6 @@
 
     <modules>
         <module>contracts</module>
-        <module>service-discovery</module>
         <module>api-gateway</module>
         <module>user-service</module>
         <module>restaurant-service</module>
@@ -35,14 +35,7 @@
 
     <dependencyManagement>
         <dependencies>
-            <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-dependencies</artifactId>
-                <version>3.2.5</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-
+            <!-- Keep Spring Cloud BOM only if some modules still use spring-cloud artifacts -->
             <dependency>
                 <groupId>org.springframework.cloud</groupId>
                 <artifactId>spring-cloud-dependencies</artifactId>

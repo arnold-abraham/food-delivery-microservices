@@ -1,18 +1,12 @@
 # Architecture Overview
 
 ```text
-                +-------------------+
-                | service-discovery |
-                |    (Eureka)       |
-                +---------+---------+
-                          ^
-                 registers|discovers
-                          v
+
 +-------------------+   routes   +-------------------+
 |    api-gateway    +----------->|   user-service    |
 | (Spring Gateway)  |            |  (Postgres:userdb)|
 +-------------------+            +-------------------+
-        | routes                  
+        | routes
         +-----------------------> +-------------------+
         |                         | restaurant-service |
         |                         | (Postgres:restdb) |
@@ -32,10 +26,10 @@
         | routes
         +-----------------------> +-------------------+
                                   | delivery-service  |
-                                  |(Postgres:deliverydb)|
+                                  | (Postgres:delivdb)|
                                   +-------------------+
 
 Notes:
-- Postgres is a single container, but we use separate databases per service.
-- Order -> Payment is synchronous HTTP for the base version.
+- Services discover each other via DNS (Docker Compose service names / Kubernetes Service DNS).
+- Only the API Gateway is exposed to callers; internal services stay private.
 ```

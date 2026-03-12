@@ -21,8 +21,7 @@ public class RootController {
                         "/payments/**",
                         "/deliveries/**"
                 ),
-                "health", "/health",
-                "eureka", "http://localhost:8761"
+                "health", "/health"
         );
     }
 }

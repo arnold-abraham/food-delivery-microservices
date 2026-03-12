@@ -12,8 +12,6 @@ spring:
     bootstrap-servers: localhost:9092
     listener:
       auto-startup: false
-
-# Disable Eureka during tests
-eureka:
-  client:
-    enabled: false
+app:
+  kafka:
+    send-timeout-ms: 1
