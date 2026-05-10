@@ -93,32 +93,23 @@ spec:
           # Kafka can take a while to come up (esp. on Minikube). Let it initialize
           # without being killed, then do functional probes.
           startupProbe:
-            exec:
-              command:
-                - sh
-                - -c
-                - "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"
+            tcpSocket:
+              port: 9092
             periodSeconds: 10
-            timeoutSeconds: 10
+            timeoutSeconds: 5
             failureThreshold: 30
           readinessProbe:
-            exec:
-              command:
-                - sh
-                - -c
-                - "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"
+            tcpSocket:
+              port: 9092
             periodSeconds: 10
-            timeoutSeconds: 10
-            failureThreshold: 12
+            timeoutSeconds: 5
+            failureThreshold: 6
           livenessProbe:
-            exec:
-              command:
-                - sh
-                - -c
-                - "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"
+            tcpSocket:
+              port: 9092
             initialDelaySeconds: 60
             periodSeconds: 20
-            timeoutSeconds: 10
+            timeoutSeconds: 5
             failureThreshold: 6
           volumeMounts:
             - name: kafka-data
