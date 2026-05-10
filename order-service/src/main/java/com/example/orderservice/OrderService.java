@@ -69,12 +69,7 @@ public class OrderService {
         order.setTotalAmount(total);
         Order saved = repository.save(order);
 
-        // best-effort event publish (avoid failing user request if Kafka is temporarily down)
-        try {
-            eventsPublisher.publishOrderPlaced(saved.getId(), saved.getUserId(), saved.getRestaurantId());
-        } catch (Exception ignored) {
-            // swallow
-        }
+        eventsPublisher.publishOrderPlaced(saved.getId(), saved.getUserId(), saved.getRestaurantId());
 
         return saved;
     }
@@ -103,14 +98,8 @@ public class OrderService {
             BigDecimal amountBd = BigDecimal.valueOf(amount);
             BigDecimal expectedBd = BigDecimal.valueOf(expectedAmount);
 
-            // best-effort: payment requested event
-            try {
-                eventsPublisher.publishPaymentRequested(order.getId(), amountBd, expectedBd);
-            } catch (Exception ignored) {
-                // swallow
-            }
+            eventsPublisher.publishPaymentRequested(order.getId(), amountBd, expectedBd);
 
-            // Call payment-service (exact amount validation via expectedAmount)
             String paymentUrl = paymentServiceBaseUrl + "/payments";
             Map<String, Object> paymentRequest = Map.of(
                     "orderId", order.getId(),
@@ -122,57 +111,46 @@ public class OrderService {
             boolean paymentSuccess = paymentResponse != null &&
                     "SUCCESS".equalsIgnoreCase(String.valueOf(paymentResponse.get("status")));
 
-            // best-effort: payment completed event
-            try {
-                eventsPublisher.publishPaymentCompleted(order.getId(), amountBd, expectedBd, paymentSuccess ? "SUCCESS" : "FAILED");
-            } catch (Exception ignored) {
-                // swallow
+            eventsPublisher.publishPaymentCompleted(order.getId(), amountBd, expectedBd,
+                    paymentSuccess ? "SUCCESS" : "FAILED");
+
+            if (!paymentSuccess) {
+                order.setStatus("FAILED");
+                return repository.save(order);
             }
 
-            String newStatus = paymentSuccess ? "PAID" : "FAILED";
-            order.setStatus(newStatus);
+            // Assign delivery BEFORE persisting PAID status. If delivery creation fails the
+            // transaction rolls back and the order stays PENDING, keeping it retryable.
+            // Known trade-off: the payment service has already charged the amount; full
+            // compensation requires a saga pattern beyond the current MVP scope.
+            Long effectiveDriverId = driverId != null ? driverId : 1L;
+
+            String userUrl = userServiceBaseUrl + "/users/" + effectiveDriverId;
+            try {
+                restTemplate.getForObject(userUrl, Map.class);
+            } catch (HttpClientErrorException ex) {
+                if (ex.getStatusCode() == HttpStatus.NOT_FOUND) {
+                    throw new IllegalArgumentException("driverId not found: " + effectiveDriverId);
+                }
+                throw ex;
+            }
+
+            String deliveryUrl = deliveryServiceBaseUrl + "/deliveries";
+            Map<String, Object> deliveryRequest = Map.of(
+                    "orderId", order.getId(),
+                    "driverId", effectiveDriverId
+            );
+            Map<?, ?> delivery = restTemplate.postForObject(deliveryUrl, deliveryRequest, Map.class);
+
+            // Delivery confirmed — now atomically persist PAID + delivery status in one save.
+            order.setStatus("PAID");
+            order.setDeliveryStatus(delivery != null && delivery.get("status") != null
+                    ? String.valueOf(delivery.get("status")) : "ASSIGNED");
             Order saved = repository.save(order);
 
-            if (paymentSuccess) {
-                Long effectiveDriverId = (driverId != null ? driverId : 1L);
-
-                // Validate driver exists in user-service (MVP: drivers are just users)
-                String userUrl = userServiceBaseUrl + "/users/" + effectiveDriverId;
-                try {
-                    restTemplate.getForObject(userUrl, Map.class);
-                } catch (HttpClientErrorException ex) {
-                    if (ex.getStatusCode() == HttpStatus.NOT_FOUND) {
-                        throw new IllegalArgumentException("driverId not found: " + effectiveDriverId);
-                    }
-                    throw ex;
-                }
-
-                // Create delivery assignment
-                String deliveryUrl = deliveryServiceBaseUrl + "/deliveries";
-                Map<String, Object> deliveryRequest = Map.of(
-                        "orderId", saved.getId(),
-                        "driverId", effectiveDriverId
-                );
-                Map<?, ?> delivery = restTemplate.postForObject(deliveryUrl, deliveryRequest, Map.class);
-
-                // best-effort: publish rider assigned event
-                try {
-                    if (delivery != null && delivery.get("id") != null) {
-                        long deliveryId = Long.parseLong(String.valueOf(delivery.get("id")));
-                        eventsPublisher.publishRiderAssigned(saved.getId(), deliveryId, effectiveDriverId);
-                    }
-                } catch (Exception ignored) {
-                    // swallow
-                }
-
-                // Store initial delivery status (best-effort)
-                if (delivery != null && delivery.get("status") != null) {
-                    saved.setDeliveryStatus(String.valueOf(delivery.get("status")));
-                    saved = repository.save(saved);
-                } else {
-                    saved.setDeliveryStatus("ASSIGNED");
-                    saved = repository.save(saved);
-                }
+            if (delivery != null && delivery.get("id") != null) {
+                long deliveryId = Long.parseLong(String.valueOf(delivery.get("id")));
+                eventsPublisher.publishRiderAssigned(saved.getId(), deliveryId, effectiveDriverId);
             }
 
             return saved;

@@ -22,7 +22,13 @@ public class JwtService {
             @Value("${security.jwt.secret}") String base64Secret,
             @Value("${security.jwt.ttl-seconds:3600}") long ttlSeconds
     ) {
-        this.signingKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(base64Secret));
+        byte[] keyBytes = Decoders.BASE64.decode(base64Secret);
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException(
+                    "JWT_SECRET must decode to at least 256 bits (32 bytes). " +
+                    "Generate one with: openssl rand -base64 48");
+        }
+        this.signingKey = Keys.hmacShaKeyFor(keyBytes);
         this.ttlSeconds = ttlSeconds;
     }
 

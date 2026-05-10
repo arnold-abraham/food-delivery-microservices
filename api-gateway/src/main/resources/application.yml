@@ -10,8 +10,8 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          # Use the same secret as user-service (HS256). Override via env var.
-          secret: ${JWT_SECRET:ZGV2LXNlY3JldC1zaG91bGQtYmUtcmVwbGFjZWQtYXQtcnVudGltZQ==}
+          # Required — no default. Must match user-service JWT_SECRET. Generate with: openssl rand -base64 48
+          secret: ${JWT_SECRET}
   cloud:
     gateway:
       # Allow browser access (dev-friendly). Tighten for production.

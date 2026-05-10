@@ -47,6 +47,8 @@ services:
     build: ./api-gateway
     ports:
       - "8079:8079"
+    environment:
+      - JWT_SECRET=${JWT_SECRET}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8079/health | grep -q UP"]
       interval: 10s
@@ -55,6 +57,8 @@ services:
 
   user-service:
     build: ./user-service
+    environment:
+      - JWT_SECRET=${JWT_SECRET}
     depends_on:
       postgres:
         condition: service_healthy

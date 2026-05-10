@@ -19,8 +19,8 @@ spring:
 
 security:
   jwt:
-    # Base64-encoded secret. Override in docker-compose for real usage.
-    secret: ${JWT_SECRET:ZGV2LXNlY3JldC1zaG91bGQtYmUtcmVwbGFjZWQtYXQtcnVudGltZQ==}
+    # Required — no default. Generate with: openssl rand -base64 48
+    secret: ${JWT_SECRET}
     ttl-seconds: ${JWT_TTL_SECONDS:3600}
 
 management:
