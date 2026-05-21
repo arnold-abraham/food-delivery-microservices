@@ -11,11 +11,13 @@ import com.example.contracts.topics.PaymentKafkaTopics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.concurrent.TimeUnit;
 
 @Component
 public class OrderEventsPublisher {
@@ -23,9 +25,17 @@ public class OrderEventsPublisher {
     private static final Logger log = LoggerFactory.getLogger(OrderEventsPublisher.class);
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final long timeoutMs;
+    private final boolean enabled;
 
-    public OrderEventsPublisher(KafkaTemplate<String, Object> kafkaTemplate) {
+    public OrderEventsPublisher(
+            KafkaTemplate<String, Object> kafkaTemplate,
+            @Value("${app.kafka.send-timeout-ms:200}") long timeoutMs,
+            @Value("${app.kafka.enabled:true}") boolean enabled
+    ) {
         this.kafkaTemplate = kafkaTemplate;
+        this.timeoutMs = timeoutMs;
+        this.enabled = enabled;
     }
 
     public void publishOrderPlaced(long orderId, long userId, long restaurantId) {
@@ -39,23 +49,7 @@ public class OrderEventsPublisher {
                 correlationId
         );
 
-        kafkaTemplate.send(OrderKafkaTopics.ORDER_PLACED, String.valueOf(orderId), event)
-                .whenComplete((result, ex) -> {
-                    if (ex != null) {
-                        log.warn("Failed to publish {} orderId={} {}={}",
-                                OrderKafkaTopics.ORDER_PLACED,
-                                orderId,
-                                CorrelationHeaders.CORRELATION_ID,
-                                correlationId,
-                                ex);
-                    } else {
-                        log.info("Published {} orderId={} {}={}",
-                                OrderKafkaTopics.ORDER_PLACED,
-                                orderId,
-                                CorrelationHeaders.CORRELATION_ID,
-                                correlationId);
-                    }
-                });
+        send(OrderKafkaTopics.ORDER_PLACED, String.valueOf(orderId), event, "orderId=" + orderId);
     }
 
     public void publishPaymentRequested(long orderId, BigDecimal amount, BigDecimal expectedAmount) {
@@ -69,23 +63,7 @@ public class OrderEventsPublisher {
                 correlationId
         );
 
-        kafkaTemplate.send(PaymentKafkaTopics.PAYMENT_REQUESTED, String.valueOf(orderId), event)
-                .whenComplete((result, ex) -> {
-                    if (ex != null) {
-                        log.warn("Failed to publish {} orderId={} {}={}",
-                                PaymentKafkaTopics.PAYMENT_REQUESTED,
-                                orderId,
-                                CorrelationHeaders.CORRELATION_ID,
-                                correlationId,
-                                ex);
-                    } else {
-                        log.info("Published {} orderId={} {}={}",
-                                PaymentKafkaTopics.PAYMENT_REQUESTED,
-                                orderId,
-                                CorrelationHeaders.CORRELATION_ID,
-                                correlationId);
-                    }
-                });
+        send(PaymentKafkaTopics.PAYMENT_REQUESTED, String.valueOf(orderId), event, "orderId=" + orderId);
     }
 
     public void publishPaymentCompleted(long orderId, BigDecimal amount, BigDecimal expectedAmount, String status) {
@@ -100,25 +78,8 @@ public class OrderEventsPublisher {
                 correlationId
         );
 
-        kafkaTemplate.send(PaymentKafkaTopics.PAYMENT_COMPLETED, String.valueOf(orderId), event)
-                .whenComplete((result, ex) -> {
-                    if (ex != null) {
-                        log.warn("Failed to publish {} orderId={} status={} {}={}",
-                                PaymentKafkaTopics.PAYMENT_COMPLETED,
-                                orderId,
-                                status,
-                                CorrelationHeaders.CORRELATION_ID,
-                                correlationId,
-                                ex);
-                    } else {
-                        log.info("Published {} orderId={} status={} {}={}",
-                                PaymentKafkaTopics.PAYMENT_COMPLETED,
-                                orderId,
-                                status,
-                                CorrelationHeaders.CORRELATION_ID,
-                                correlationId);
-                    }
-                });
+        send(PaymentKafkaTopics.PAYMENT_COMPLETED, String.valueOf(orderId), event,
+                "orderId=" + orderId + " status=" + status);
     }
 
     public void publishRiderAssigned(long orderId, long deliveryId, long driverId) {
@@ -132,26 +93,24 @@ public class OrderEventsPublisher {
                 correlationId
         );
 
-        kafkaTemplate.send(DeliveryKafkaTopics.RIDER_ASSIGNED, String.valueOf(orderId), event)
-                .whenComplete((result, ex) -> {
-                    if (ex != null) {
-                        log.warn("Failed to publish {} orderId={} deliveryId={} driverId={} {}={}",
-                                DeliveryKafkaTopics.RIDER_ASSIGNED,
-                                orderId,
-                                deliveryId,
-                                driverId,
-                                CorrelationHeaders.CORRELATION_ID,
-                                correlationId,
-                                ex);
-                    } else {
-                        log.info("Published {} orderId={} deliveryId={} driverId={} {}={}",
-                                DeliveryKafkaTopics.RIDER_ASSIGNED,
-                                orderId,
-                                deliveryId,
-                                driverId,
-                                CorrelationHeaders.CORRELATION_ID,
-                                correlationId);
-                    }
-                });
+        send(DeliveryKafkaTopics.RIDER_ASSIGNED, String.valueOf(orderId), event,
+                "orderId=" + orderId + " deliveryId=" + deliveryId + " driverId=" + driverId);
+    }
+
+    private void send(String topic, String key, Object event, String details) {
+        if (!enabled) {
+            return;
+        }
+        String correlationId = MDC.get(CorrelationHeaders.MDC_KEY);
+        try {
+            // Bound the time we wait for metadata/ack so tests don't stall when Kafka isn't running.
+            kafkaTemplate.send(topic, key, event)
+                    .get(timeoutMs, TimeUnit.MILLISECONDS);
+
+            log.info("Published {} {} {}={}", topic, details, CorrelationHeaders.CORRELATION_ID, correlationId);
+        } catch (Exception ex) {
+            log.warn("Failed to publish {} {} {}={} (non-fatal)",
+                    topic, details, CorrelationHeaders.CORRELATION_ID, correlationId, ex);
+        }
     }
 }

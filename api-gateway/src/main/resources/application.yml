@@ -10,8 +10,8 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          # Use the same secret as user-service (HS256). Override via env var.
-          secret: ${JWT_SECRET:ZGV2LXNlY3JldC1zaG91bGQtYmUtcmVwbGFjZWQtYXQtcnVudGltZQ==}
+          # Required — no default. Must match user-service JWT_SECRET. Generate with: openssl rand -base64 48
+          secret: ${JWT_SECRET}
   cloud:
     gateway:
       # Allow browser access (dev-friendly). Tighten for production.
@@ -31,34 +31,29 @@ spring:
               - "*"
       routes:
         - id: auth
-          uri: lb://user-service
+          uri: http://user-service:8081
           predicates:
             - Path=/auth/**
         - id: user-service
-          uri: lb://user-service
+          uri: http://user-service:8081
           predicates:
             - Path=/users/**
         - id: restaurant-service
-          uri: lb://restaurant-service
+          uri: http://restaurant-service:8082
           predicates:
             - Path=/restaurants/**
         - id: order-service
-          uri: lb://order-service
+          uri: http://order-service:8083
           predicates:
             - Path=/orders/**
         - id: payment-service
-          uri: lb://payment-service
+          uri: http://payment-service:8084
           predicates:
             - Path=/payments/**
         - id: delivery-service
-          uri: lb://delivery-service
+          uri: http://delivery-service:8086
           predicates:
             - Path=/deliveries/**
-
-eureka:
-  client:
-    service-url:
-      defaultZone: ${EUREKA_URL:http://service-discovery:8761/eureka/}
 
 management:
   endpoints:

@@ -19,7 +19,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@SpringBootTest(properties = {
+        "app.kafka.enabled=false"
+})
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class OrderFlowSmokeTest {
@@ -69,8 +71,8 @@ class OrderFlowSmokeTest {
                 .andExpect(jsonPath("$.totalAmount").value(24.0))
                 .andReturn().getResponse().getContentAsString();
 
-        // Extract orderId without adding extra deps
-        long orderId = Long.parseLong(createdBody.replaceAll("(?s).*\"id\"\\s*:\\s*(\\d+).*", "$1"));
+        // Extract orderId without adding extra deps (match the first top-level "id" field)
+        long orderId = Long.parseLong(createdBody.replaceAll("(?s).*?\"id\"\\s*:\\s*(\\d+).*", "$1"));
         assertThat(orderId).isGreaterThan(0);
 
         // Pay order

@@ -29,9 +29,3 @@ management:
     web:
       exposure:
         include: health,info,prometheus
-
-# Eureka service discovery
-eureka:
-  client:
-    service-url:
-      defaultZone: ${EUREKA_URL:http://service-discovery:8761/eureka/}

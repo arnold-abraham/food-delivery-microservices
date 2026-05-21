@@ -38,3 +38,6 @@ node_modules/
 
 # Other build artifacts
 *.original
+
+# Local secrets — never commit
+.env

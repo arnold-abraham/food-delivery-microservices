@@ -8,8 +8,3 @@ spring:
     hibernate:
       ddl-auto: create-drop
     show-sql: false
-
-eureka:
-  client:
-    enabled: false
-

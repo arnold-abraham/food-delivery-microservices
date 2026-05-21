@@ -39,13 +39,6 @@ management:
       exposure:
         include: health,info,prometheus
 
-eureka:
-  client:
-    service-url:
-      defaultZone: http://service-discovery:8761/eureka/
-  instance:
-    prefer-ip-address: true
-
 order:
   payment-service-url: http://payment-service:8084
   delivery-service-url: http://delivery-service:8086
