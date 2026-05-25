@@ -46,6 +46,8 @@ spec:
       labels:
         app: kafka
     spec:
+      securityContext:
+        fsGroup: 1000
       containers:
         - name: kafka
           image: apache/kafka:3.7.0
@@ -79,7 +81,7 @@ spec:
 
             # Persist Kafka logs to the PVC.
             - name: KAFKA_LOG_DIRS
-              value: "/var/lib/kafka/data"
+              value: "/var/lib/kafka/data/logs"
 
             # Single-node defaults
             - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
@@ -119,6 +121,7 @@ spec:
         name: kafka-data
       spec:
         accessModes: ["ReadWriteOnce"]
+        storageClassName: gp2
         resources:
           requests:
             storage: 2Gi

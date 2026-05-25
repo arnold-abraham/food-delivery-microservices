@@ -44,6 +44,7 @@ spec:
               port: 8079
             periodSeconds: 10
             timeoutSeconds: 2
+
             failureThreshold: 60
           readinessProbe:
             httpGet:
