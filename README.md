@@ -1,106 +1,91 @@
 # Food Delivery Microservices
 
-Java 17 + Spring Boot microservices with API Gateway, Postgres, Kafka events, and JWT auth.
-
-## What’s included
-
-- API gateway routing (single entrypoint)
-- DNS-based service discovery (Docker / Kubernetes)
-- Postgres persistence for user/restaurant/order/delivery services (one Postgres container, separate DB per service)
-- Kafka events for key lifecycle updates (order/payment/delivery)
-- End-to-end flow:
-  - user registration + JWT login
-  - create menu items
-  - create order with items (total calculated from menu prices)
-  - pay with exact amount
-  - assign delivery to a driver and update delivery status
-  - `GET /orders/{id}` includes latest delivery status
+Java 17 + Spring Boot 3.2, API Gateway, PostgreSQL, Kafka (KRaft), JWT auth.
 
 ## Services
 
-- **api-gateway**: single entrypoint (http://localhost:8079)
-- **user-service**: users + auth (`/users/**`, `/auth/**`)
-- **restaurant-service**: restaurants + menu (`/restaurants/**`)
-- **order-service**: orders + pay (`/orders/**`)
-- **payment-service**: payments (`/payments/**`)
-- **delivery-service**: deliveries (`/deliveries/**`)
+| Service | Port | Routes |
+|---|---|---|
+| api-gateway | 8079 | all traffic — single entrypoint |
+| user-service | 8081 | `/auth/**`, `/users/**` |
+| restaurant-service | 8082 | `/restaurants/**` |
+| order-service | 8083 | `/orders/**` |
+| payment-service | 8084 | `/payments/**` |
+| delivery-service | 8086 | `/deliveries/**` |
 
-## Run (Docker)
+## Run — Docker Compose
 
 ```bash
+cp .env.example .env        # fill in JWT_SECRET (openssl rand -base64 48)
 mvn -DskipTests clean package
 docker compose up --build
 ```
 
-## Run (Kubernetes / Minikube)
+Gateway: `http://localhost:8079`
 
-This repo includes a baseline Kubernetes setup in `k8s/`:
-
-- **No Eureka**: services talk via Kubernetes DNS (`http://order-service:8083`, etc.) using `ClusterIP` Services.
-- **Only the API Gateway is exposed**: via an Ingress.
-- **Postgres and Kafka are StatefulSets** with PVCs for persistence.
-- **Config is externalized** via ConfigMaps and Secrets.
-
-### Prereqs
-
-- `minikube`, `kubectl`
-- An Ingress controller (on Minikube, the built-in addon works)
-
-### Build images for Minikube
-
-If your Minikube uses its own Docker daemon, you’ll typically do:
+## Run — Minikube
 
 ```bash
-eval $(minikube -p minikube docker-env)
-```
+mvn -DskipTests clean package
+eval $(minikube docker-env)
 
-Then build the service images (tags match the manifests):
+for svc in api-gateway user-service restaurant-service order-service payment-service delivery-service; do
+  docker build -t ${svc}:0.0.1-SNAPSHOT ./${svc}/
+done
 
-```bash
-docker build -t api-gateway:0.0.1-SNAPSHOT ./api-gateway
-docker build -t user-service:0.0.1-SNAPSHOT ./user-service
-docker build -t restaurant-service:0.0.1-SNAPSHOT ./restaurant-service
-docker build -t order-service:0.0.1-SNAPSHOT ./order-service
-docker build -t payment-service:0.0.1-SNAPSHOT ./payment-service
-docker build -t delivery-service:0.0.1-SNAPSHOT ./delivery-service
-```
-
-### Deploy
-
-```bash
+# fill in JWT_SECRET in k8s/02-secrets.yaml before applying
 kubectl apply -f k8s/
+kubectl port-forward -n food svc/api-gateway 8079:8079
 ```
 
-Enable ingress on Minikube:
+## Run — AWS EKS
+
+One-command bring-up (~20 min first run):
 
 ```bash
-minikube addons enable ingress
+bash scripts/eks-up.sh
 ```
 
-Then access the Gateway through the Minikube ingress IP (or `minikube tunnel` depending on driver):
+Prints a public Load Balancer URL when ready. Tear down everything when done:
 
 ```bash
-minikube ip
+bash scripts/eks-down.sh
 ```
 
-### Optional: Autoscaling
+**Prereqs:** `terraform`, `aws` CLI configured, `kubectl`, Docker.  
+**Cost:** ~$0.28/hour while running (2 × m7i-flex.large + EKS control plane + NAT gateway).
 
-`k8s/40-order-hpa.yaml` includes an HPA for `order-service` (requires metrics-server in your cluster).
+## End-to-end test
 
-## Auth (JWT)
+```bash
+# Docker / Minikube (port-forwarded)
+bash scripts/demo-flow.sh
 
-Most endpoints are protected. Obtain a token via `/auth/register` and `/auth/login`, then pass:
+# EKS (use the Load Balancer URL printed by eks-up.sh)
+GATEWAY_URL=http://<lb-hostname> bash scripts/demo-flow.sh
+```
 
-- `Authorization: Bearer <token>`
+Flow: register → login → create restaurant + menu → place order → pay → assign driver → deliver.
 
-## Kafka
+## Auth
 
-Kafka runs via Docker Compose. See `scripts/kafka-sanity.sh` for a quick local topic/consumer demo.
+All endpoints except `/health`, `/auth/register`, `/auth/login` require:
+
+```
+Authorization: Bearer <token>
+```
+
+Get a token via `POST /auth/login`.
+
+## Secrets
+
+`k8s/02-secrets.yaml` and `.env.example` contain **placeholders only** — never commit real secrets.  
+Generate a JWT secret: `openssl rand -base64 48`
 
 ## Observability
 
-- Prometheus: http://localhost:9090
-- Grafana: http://localhost:3000 (admin/admin)
+Prometheus and Grafana are included in Docker Compose (`localhost:9090` / `localhost:3000`).  
+All services expose `/actuator/health` and `/actuator/prometheus`.
 
 ## Architecture
 
