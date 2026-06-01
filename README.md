@@ -77,11 +77,6 @@ Authorization: Bearer <token>
 
 Get a token via `POST /auth/login`.
 
-## Secrets
-
-`k8s/02-secrets.yaml` and `.env.example` contain **placeholders only** — never commit real secrets.  
-Generate a JWT secret: `openssl rand -base64 48`
-
 ## Observability
 
 Prometheus and Grafana are included in Docker Compose (`localhost:9090` / `localhost:3000`).  
