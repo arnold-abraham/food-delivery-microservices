@@ -4,8 +4,6 @@ import com.example.contracts.CorrelationHeaders;
 import com.example.contracts.events.OrderPlacedEvent;
 import com.example.contracts.events.PaymentCompletedEvent;
 import com.example.contracts.events.PaymentRequestedEvent;
-import com.example.contracts.events.RiderAssignedEvent;
-import com.example.contracts.topics.DeliveryKafkaTopics;
 import com.example.contracts.topics.OrderKafkaTopics;
 import com.example.contracts.topics.PaymentKafkaTopics;
 import org.slf4j.Logger;
@@ -80,21 +78,6 @@ public class OrderEventsPublisher {
 
         send(PaymentKafkaTopics.PAYMENT_COMPLETED, String.valueOf(orderId), event,
                 "orderId=" + orderId + " status=" + status);
-    }
-
-    public void publishRiderAssigned(long orderId, long deliveryId, long driverId) {
-        String correlationId = MDC.get(CorrelationHeaders.MDC_KEY);
-        RiderAssignedEvent event = new RiderAssignedEvent(
-                RiderAssignedEvent.VERSION,
-                orderId,
-                deliveryId,
-                driverId,
-                Instant.now(),
-                correlationId
-        );
-
-        send(DeliveryKafkaTopics.RIDER_ASSIGNED, String.valueOf(orderId), event,
-                "orderId=" + orderId + " deliveryId=" + deliveryId + " driverId=" + driverId);
     }
 
     private void send(String topic, String key, Object event, String details) {

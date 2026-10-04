@@ -33,8 +33,15 @@ public class DeliveryService {
 
     @Transactional
     public Delivery createAssignment(Long orderId, Long driverId) {
-        // MVP: always create as ASSIGNED
-        return repository.save(new Delivery(orderId, driverId, DeliveryStatus.ASSIGNED.name()));
+        Delivery saved = repository.save(new Delivery(orderId, driverId, DeliveryStatus.ASSIGNED.name()));
+
+        try {
+            eventsPublisher.publishRiderAssigned(saved.getId(), saved.getOrderId(), saved.getDriverId(), CorrelationIdHolder.currentOrNull());
+        } catch (Exception ex) {
+            // swallow; assignment is already persisted
+        }
+
+        return saved;
     }
 
     @Transactional

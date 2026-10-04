@@ -148,11 +148,6 @@ public class OrderService {
                     ? String.valueOf(delivery.get("status")) : "ASSIGNED");
             Order saved = repository.save(order);
 
-            if (delivery != null && delivery.get("id") != null) {
-                long deliveryId = Long.parseLong(String.valueOf(delivery.get("id")));
-                eventsPublisher.publishRiderAssigned(saved.getId(), deliveryId, effectiveDriverId);
-            }
-
             return saved;
         });
     }
