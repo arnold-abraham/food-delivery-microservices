@@ -2,10 +2,7 @@ package com.example.orderservice.kafka;
 
 import com.example.contracts.CorrelationHeaders;
 import com.example.contracts.events.OrderPlacedEvent;
-import com.example.contracts.events.PaymentCompletedEvent;
-import com.example.contracts.events.PaymentRequestedEvent;
 import com.example.contracts.topics.OrderKafkaTopics;
-import com.example.contracts.topics.PaymentKafkaTopics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -13,7 +10,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 
@@ -48,36 +44,6 @@ public class OrderEventsPublisher {
         );
 
         send(OrderKafkaTopics.ORDER_PLACED, String.valueOf(orderId), event, "orderId=" + orderId);
-    }
-
-    public void publishPaymentRequested(long orderId, BigDecimal amount, BigDecimal expectedAmount) {
-        String correlationId = MDC.get(CorrelationHeaders.MDC_KEY);
-        PaymentRequestedEvent event = new PaymentRequestedEvent(
-                PaymentRequestedEvent.VERSION,
-                orderId,
-                amount,
-                expectedAmount,
-                Instant.now(),
-                correlationId
-        );
-
-        send(PaymentKafkaTopics.PAYMENT_REQUESTED, String.valueOf(orderId), event, "orderId=" + orderId);
-    }
-
-    public void publishPaymentCompleted(long orderId, BigDecimal amount, BigDecimal expectedAmount, String status) {
-        String correlationId = MDC.get(CorrelationHeaders.MDC_KEY);
-        PaymentCompletedEvent event = new PaymentCompletedEvent(
-                PaymentCompletedEvent.VERSION,
-                orderId,
-                amount,
-                expectedAmount,
-                status,
-                Instant.now(),
-                correlationId
-        );
-
-        send(PaymentKafkaTopics.PAYMENT_COMPLETED, String.valueOf(orderId), event,
-                "orderId=" + orderId + " status=" + status);
     }
 
     private void send(String topic, String key, Object event, String details) {

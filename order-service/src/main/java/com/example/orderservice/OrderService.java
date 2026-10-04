@@ -8,7 +8,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -95,10 +94,6 @@ public class OrderService {
     public Optional<Order> pay(Long orderId, double amount, Long driverId) {
         return repository.findById(orderId).map(order -> {
             double expectedAmount = order.getTotalAmount() != null ? order.getTotalAmount() : 0.0;
-            BigDecimal amountBd = BigDecimal.valueOf(amount);
-            BigDecimal expectedBd = BigDecimal.valueOf(expectedAmount);
-
-            eventsPublisher.publishPaymentRequested(order.getId(), amountBd, expectedBd);
 
             String paymentUrl = paymentServiceBaseUrl + "/payments";
             Map<String, Object> paymentRequest = Map.of(
@@ -110,9 +105,6 @@ public class OrderService {
             Map<?, ?> paymentResponse = restTemplate.postForObject(paymentUrl, paymentRequest, Map.class);
             boolean paymentSuccess = paymentResponse != null &&
                     "SUCCESS".equalsIgnoreCase(String.valueOf(paymentResponse.get("status")));
-
-            eventsPublisher.publishPaymentCompleted(order.getId(), amountBd, expectedBd,
-                    paymentSuccess ? "SUCCESS" : "FAILED");
 
             if (!paymentSuccess) {
                 order.setStatus("FAILED");
