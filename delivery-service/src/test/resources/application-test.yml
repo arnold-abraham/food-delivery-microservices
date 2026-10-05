@@ -12,3 +12,12 @@ spring:
     bootstrap-servers: localhost:9092
     listener:
       auto-startup: false
+    producer:
+      properties:
+        max.block.ms: 500
+        request.timeout.ms: 500
+        delivery.timeout.ms: 1000
+
+app:
+  kafka:
+    send-timeout-ms: 1
