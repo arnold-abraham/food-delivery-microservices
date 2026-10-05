@@ -32,6 +32,13 @@ public class PaymentController {
 
     @PostMapping
     public ResponseEntity<PaymentResponse> pay(@Valid @RequestBody PaymentRequest req) {
+        BigDecimal amount = BigDecimal.valueOf(req.amount());
+        BigDecimal expectedAmount = req.expectedAmount() != null
+                ? BigDecimal.valueOf(req.expectedAmount())
+                : amount;
+
+        eventsPublisher.publishPaymentRequested(req.orderId(), amount, expectedAmount);
+
         boolean ok = req.amount() > 0
                 && (req.expectedAmount() == null || Double.compare(req.amount(), req.expectedAmount()) == 0);
 
@@ -41,12 +48,7 @@ public class PaymentController {
         log.info("Processed payment orderId={} amount={} expectedAmount={} status={}",
                 req.orderId(), req.amount(), req.expectedAmount(), status);
 
-        eventsPublisher.publishPaymentCompleted(
-                req.orderId(),
-                BigDecimal.valueOf(req.amount()),
-                req.expectedAmount() != null ? BigDecimal.valueOf(req.expectedAmount()) : BigDecimal.valueOf(req.amount()),
-                status
-        );
+        eventsPublisher.publishPaymentCompleted(req.orderId(), amount, expectedAmount, status);
 
         return ResponseEntity.ok(new PaymentResponse(req.orderId(), status, message));
     }

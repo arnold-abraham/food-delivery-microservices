@@ -2,6 +2,7 @@ package com.example.paymentservice.kafka;
 
 import com.example.contracts.CorrelationHeaders;
 import com.example.contracts.events.PaymentCompletedEvent;
+import com.example.contracts.events.PaymentRequestedEvent;
 import com.example.contracts.topics.PaymentKafkaTopics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +29,31 @@ public class PaymentEventsPublisher {
     ) {
         this.kafkaTemplate = kafkaTemplate;
         this.timeoutMs = timeoutMs;
+    }
+
+    public void publishPaymentRequested(Long orderId, BigDecimal amount, BigDecimal expectedAmount) {
+        String correlationId = MDC.get(CorrelationHeaders.MDC_KEY);
+        PaymentRequestedEvent event = new PaymentRequestedEvent(
+                PaymentRequestedEvent.VERSION,
+                orderId,
+                amount,
+                expectedAmount,
+                Instant.now(),
+                correlationId
+        );
+
+        try {
+            kafkaTemplate.send(PaymentKafkaTopics.PAYMENT_REQUESTED, String.valueOf(orderId), event)
+                    .get(timeoutMs, TimeUnit.MILLISECONDS);
+
+            log.info("Published {} orderId={} {}={}",
+                    PaymentKafkaTopics.PAYMENT_REQUESTED, orderId,
+                    CorrelationHeaders.CORRELATION_ID, correlationId);
+        } catch (Exception ex) {
+            log.warn("Failed to publish {} orderId={} {}={} (non-fatal)",
+                    PaymentKafkaTopics.PAYMENT_REQUESTED, orderId,
+                    CorrelationHeaders.CORRELATION_ID, correlationId, ex);
+        }
     }
 
     public void publishPaymentCompleted(Long orderId, BigDecimal amount, BigDecimal expectedAmount, String status) {
