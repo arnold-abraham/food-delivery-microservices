@@ -26,7 +26,6 @@ flowchart LR
     subgraph events["Async Events · Kafka KRaft"]
         kafka[("Kafka broker<br/>:9092 internal<br/>:19092 host")]
         placed["order.placed.v1"]
-        requested["payment.requested.v1"]
         completed["payment.completed.v1"]
         assigned["delivery.rider.assigned.v1"]
         status["delivery.status.changed.v1"]
@@ -62,13 +61,11 @@ flowchart LR
     deliverydb --- postgres
 
     order -.->|"publish"| placed
-    order -.->|"publish"| requested
-    order -.->|"publish"| completed
-    order -.->|"publish"| assigned
+    payment -.->|"publish"| completed
+    delivery -.->|"publish on assignment"| assigned
     delivery -.->|"publish on status update"| status
 
     placed --> kafka
-    requested --> kafka
     completed --> kafka
     assigned --> kafka
     status --> kafka
@@ -94,7 +91,7 @@ flowchart LR
     class user,restaurant,order,payment,delivery,statusListener service
     class postgres,userdb,restaurantdb,orderdb,deliverydb database
     class kafka broker
-    class placed,requested,completed,assigned,status event
+    class placed,completed,assigned,status event
     class prometheus,grafana ops
 
 ```
@@ -108,7 +105,7 @@ Solid arrows are synchronous HTTP or persistence relationships. Dashed arrows ar
 1. The client sends the request through the API gateway.
 2. `order-service` persists the order and synchronously validates menu items with `restaurant-service`.
 3. `order-service` synchronously calls `payment-service`; successful payment is followed by driver validation through `user-service` and delivery creation through `delivery-service`.
-4. `order-service` publishes order, payment, and rider-assignment events to Kafka. These publications are bounded and non-fatal: the primary HTTP flow does not fail solely because Kafka is unavailable.
+4. `order-service` publishes `order.placed.v1` to Kafka. `payment-service` publishes `payment.completed.v1` after processing the payment. `delivery-service` publishes `delivery.rider.assigned.v1` after creating the assignment. All three publications are best-effort and non-fatal.
 
 ### Delivery status updates
 
@@ -121,9 +118,9 @@ Solid arrows are synchronous HTTP or persistence relationships. Dashed arrows ar
 | `api-gateway` | 8079 | — | — |
 | `user-service` | 8081 | `userdb` | — |
 | `restaurant-service` | 8082 | `restaurantdb` | — |
-| `order-service` | 8083 | `orderdb` | Publishes order/payment/delivery-assignment events; consumes delivery status |
-| `payment-service` | 8084 | Stateless | — |
-| `delivery-service` | 8086 | `deliverydb` | Publishes delivery status events |
+| `order-service` | 8083 | `orderdb` | Publishes `order.placed.v1`; consumes `delivery.status.changed.v1` |
+| `payment-service` | 8084 | Stateless (no DB) | Publishes `payment.completed.v1` |
+| `delivery-service` | 8086 | `deliverydb` | Publishes `delivery.rider.assigned.v1` and `delivery.status.changed.v1` |
 
 The four service databases are separate PostgreSQL databases hosted by one PostgreSQL 15 instance. Services access one another by Compose/Kubernetes DNS names; clients use only the gateway.
 
@@ -132,9 +129,8 @@ The four service databases are separate PostgreSQL databases hosted by one Postg
 | Topic | Publisher | Consumer |
 |---|---|---|
 | `order.placed.v1` | `order-service` | No application consumer |
-| `payment.requested.v1` | `order-service` | No application consumer |
-| `payment.completed.v1` | `order-service` | No application consumer |
-| `delivery.rider.assigned.v1` | `order-service` | No application consumer |
+| `payment.completed.v1` | `payment-service` | No application consumer |
+| `delivery.rider.assigned.v1` | `delivery-service` | No application consumer |
 | `delivery.status.changed.v1` | `delivery-service` | `order-service` |
 
 Kafka runs as a single-node KRaft broker without ZooKeeper. Containers and Kubernetes clients use `kafka:9092`; Docker Compose exposes `localhost:19092` for host access.
