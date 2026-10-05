@@ -72,8 +72,10 @@ flowchart LR
     completed --> kafka
     assigned --> kafka
     status --> kafka
-    kafka -.->|"consume"| statusListener["order-service<br/>Kafka listener"]
+    kafka -.->|"consume"| statusListener["order-service<br/>delivery listener"]
     statusListener -->|"update deliveryStatus<br/>DELIVERED → order status"| order
+    kafka -.->|"consume"| paymentListener["order-service<br/>payment listener"]
+    paymentListener -->|"reconcile payment status<br/>PENDING → PAID / FAILED"| order
 
     prometheus -.->|"scrapes /actuator/prometheus"| gateway
     prometheus -.-> user
@@ -91,7 +93,7 @@ flowchart LR
     classDef ops fill:#374151,stroke:#9ca3af,color:#fff,stroke-width:2px
 
     class client,ingress,gateway edge
-    class user,restaurant,order,payment,delivery,statusListener service
+    class user,restaurant,order,payment,delivery,statusListener,paymentListener service
     class postgres,userdb,restaurantdb,orderdb,deliverydb database
     class kafka broker
     class placed,requested,completed,assigned,status event
@@ -108,7 +110,7 @@ Solid arrows are synchronous HTTP or persistence relationships. Dashed arrows ar
 1. The client sends the request through the API gateway.
 2. `order-service` persists the order and synchronously validates menu items with `restaurant-service`.
 3. `order-service` synchronously calls `payment-service`; successful payment is followed by driver validation through `user-service` and delivery creation through `delivery-service`.
-4. `order-service` publishes `order.placed.v1` to Kafka. `payment-service` publishes `payment.requested.v1` before processing and `payment.completed.v1` after. `delivery-service` publishes `delivery.rider.assigned.v1` after creating the assignment. All publications are best-effort and non-fatal.
+4. `order-service` publishes `order.placed.v1` to Kafka. `payment-service` publishes `payment.requested.v1` before processing and `payment.completed.v1` after. `delivery-service` publishes `delivery.rider.assigned.v1` after creating the assignment. All publications are best-effort and non-fatal. `order-service` also consumes `payment.completed.v1` as a reconciliation path: if the order is still `PENDING` when the event arrives (e.g. the sync HTTP response was lost), the listener drives it to `PAID` or `FAILED`.
 
 ### Delivery status updates
 
@@ -121,7 +123,7 @@ Solid arrows are synchronous HTTP or persistence relationships. Dashed arrows ar
 | `api-gateway` | 8079 | — | — |
 | `user-service` | 8081 | `userdb` | — |
 | `restaurant-service` | 8082 | `restaurantdb` | — |
-| `order-service` | 8083 | `orderdb` | Publishes `order.placed.v1`; consumes `delivery.status.changed.v1` |
+| `order-service` | 8083 | `orderdb` | Publishes `order.placed.v1`; consumes `payment.completed.v1` and `delivery.status.changed.v1` |
 | `payment-service` | 8084 | Stateless (no DB) | Publishes `payment.requested.v1` and `payment.completed.v1` |
 | `delivery-service` | 8086 | `deliverydb` | Publishes `delivery.rider.assigned.v1` and `delivery.status.changed.v1` |
 
@@ -133,7 +135,7 @@ The four service databases are separate PostgreSQL databases hosted by one Postg
 |---|---|---|
 | `order.placed.v1` | `order-service` | No application consumer |
 | `payment.requested.v1` | `payment-service` | No application consumer |
-| `payment.completed.v1` | `payment-service` | No application consumer |
+| `payment.completed.v1` | `payment-service` | `order-service` (reconciliation) |
 | `delivery.rider.assigned.v1` | `delivery-service` | No application consumer |
 | `delivery.status.changed.v1` | `delivery-service` | `order-service` |
 
