@@ -1,6 +1,7 @@
 package com.example.orderservice.kafka;
 
 import com.example.contracts.CorrelationHeaders;
+import com.example.contracts.events.OrderPaidEvent;
 import com.example.contracts.events.OrderPlacedEvent;
 import com.example.contracts.topics.OrderKafkaTopics;
 import org.slf4j.Logger;
@@ -44,6 +45,20 @@ public class OrderEventsPublisher {
         );
 
         send(OrderKafkaTopics.ORDER_PLACED, String.valueOf(orderId), event, "orderId=" + orderId);
+    }
+
+    public void publishOrderPaid(long orderId, long driverId) {
+        String correlationId = MDC.get(CorrelationHeaders.MDC_KEY);
+        OrderPaidEvent event = new OrderPaidEvent(
+                OrderPaidEvent.VERSION,
+                orderId,
+                driverId,
+                Instant.now(),
+                correlationId
+        );
+
+        send(OrderKafkaTopics.ORDER_PAID, String.valueOf(orderId), event,
+                "orderId=" + orderId + " driverId=" + driverId);
     }
 
     private void send(String topic, String key, Object event, String details) {

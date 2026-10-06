@@ -30,6 +30,7 @@ flowchart LR
         completed["payment.completed.v1"]
         assigned["delivery.rider.assigned.v1"]
         status["delivery.status.changed.v1"]
+        paid["order.paid.v1"]
     end
 
     subgraph observability["Observability"]
@@ -49,8 +50,7 @@ flowchart LR
 
     order -->|"GET menu item<br/>sync HTTP"| restaurant
     order -->|"POST payment<br/>sync HTTP"| payment
-    order -->|"GET driver<br/>sync HTTP"| user
-    order -->|"POST / GET delivery<br/>sync HTTP"| delivery
+    order -->|"GET delivery<br/>sync HTTP"| delivery
 
     user --- userdb
     restaurant --- restaurantdb
@@ -62,16 +62,22 @@ flowchart LR
     deliverydb --- postgres
 
     order -.->|"publish"| placed
+    order -.->|"publish on payment"| paid
     payment -.->|"publish"| requested
     payment -.->|"publish"| completed
     delivery -.->|"publish on assignment"| assigned
     delivery -.->|"publish on status update"| status
 
     placed --> kafka
+    paid --> kafka
     requested --> kafka
     completed --> kafka
     assigned --> kafka
     status --> kafka
+    kafka -.->|"consume"| orderPaidListener["delivery-service<br/>order.paid listener"]
+    orderPaidListener -->|"create assignment"| delivery
+    kafka -.->|"consume"| riderAssignedListener["order-service<br/>rider.assigned listener"]
+    riderAssignedListener -->|"update deliveryStatus ASSIGNED"| order
     kafka -.->|"consume"| statusListener["order-service<br/>delivery listener"]
     statusListener -->|"update deliveryStatus<br/>DELIVERED → order status"| order
     kafka -.->|"consume"| paymentListener["order-service<br/>payment listener"]
@@ -93,10 +99,10 @@ flowchart LR
     classDef ops fill:#374151,stroke:#9ca3af,color:#fff,stroke-width:2px
 
     class client,ingress,gateway edge
-    class user,restaurant,order,payment,delivery,statusListener,paymentListener service
+    class user,restaurant,order,payment,delivery,statusListener,paymentListener,orderPaidListener,riderAssignedListener service
     class postgres,userdb,restaurantdb,orderdb,deliverydb database
     class kafka broker
-    class placed,requested,completed,assigned,status event
+    class placed,requested,completed,assigned,status,paid event
     class prometheus,grafana ops
 
 ```
@@ -109,8 +115,8 @@ Solid arrows are synchronous HTTP or persistence relationships. Dashed arrows ar
 
 1. The client sends the request through the API gateway.
 2. `order-service` persists the order and synchronously validates menu items with `restaurant-service`.
-3. `order-service` synchronously calls `payment-service`; successful payment is followed by driver validation through `user-service` and delivery creation through `delivery-service`.
-4. `order-service` publishes `order.placed.v1` to Kafka. `payment-service` publishes `payment.requested.v1` before processing and `payment.completed.v1` after. `delivery-service` publishes `delivery.rider.assigned.v1` after creating the assignment. All publications are best-effort and non-fatal. `order-service` also consumes `payment.completed.v1` as a reconciliation path: if the order is still `PENDING` when the event arrives (e.g. the sync HTTP response was lost), the listener drives it to `PAID` or `FAILED`.
+3. `order-service` synchronously calls `payment-service`. On success it sets order status to `PAID` and publishes `order.paid.v1`.
+4. `delivery-service` consumes `order.paid.v1` and creates the delivery assignment asynchronously. It then publishes `delivery.rider.assigned.v1`, which `order-service` consumes to set `deliveryStatus = ASSIGNED`. `order-service` also publishes `order.placed.v1`. `payment-service` publishes `payment.requested.v1` before processing and `payment.completed.v1` after. `order-service` consumes `payment.completed.v1` as a reconciliation path: if the order is still `PENDING` when the event arrives, the listener drives it to `PAID` or `FAILED`. All Kafka publications are best-effort and non-fatal.
 
 ### Delivery status updates
 
@@ -123,9 +129,9 @@ Solid arrows are synchronous HTTP or persistence relationships. Dashed arrows ar
 | `api-gateway` | 8079 | — | — |
 | `user-service` | 8081 | `userdb` | — |
 | `restaurant-service` | 8082 | `restaurantdb` | — |
-| `order-service` | 8083 | `orderdb` | Publishes `order.placed.v1`; consumes `payment.completed.v1` and `delivery.status.changed.v1` |
+| `order-service` | 8083 | `orderdb` | Publishes `order.placed.v1` and `order.paid.v1`; consumes `payment.completed.v1`, `delivery.rider.assigned.v1`, and `delivery.status.changed.v1` |
 | `payment-service` | 8084 | Stateless (no DB) | Publishes `payment.requested.v1` and `payment.completed.v1` |
-| `delivery-service` | 8086 | `deliverydb` | Publishes `delivery.rider.assigned.v1` and `delivery.status.changed.v1` |
+| `delivery-service` | 8086 | `deliverydb` | Publishes `delivery.rider.assigned.v1` and `delivery.status.changed.v1`; consumes `order.paid.v1` |
 
 The four service databases are separate PostgreSQL databases hosted by one PostgreSQL 15 instance. Services access one another by Compose/Kubernetes DNS names; clients use only the gateway.
 
@@ -134,9 +140,10 @@ The four service databases are separate PostgreSQL databases hosted by one Postg
 | Topic | Publisher | Consumer |
 |---|---|---|
 | `order.placed.v1` | `order-service` | No application consumer |
+| `order.paid.v1` | `order-service` | `delivery-service` (trigger assignment) |
 | `payment.requested.v1` | `payment-service` | No application consumer |
 | `payment.completed.v1` | `payment-service` | `order-service` (reconciliation) |
-| `delivery.rider.assigned.v1` | `delivery-service` | No application consumer |
+| `delivery.rider.assigned.v1` | `delivery-service` | `order-service` (set deliveryStatus ASSIGNED) |
 | `delivery.status.changed.v1` | `delivery-service` | `order-service` |
 
 Kafka runs as a single-node KRaft broker without ZooKeeper. Containers and Kubernetes clients use `kafka:9092`; Docker Compose exposes `localhost:19092` for host access.
@@ -149,7 +156,7 @@ For production scale, the main follow-up concerns are deliberate trade-offs rath
 
 - Kafka is single-node and PostgreSQL is a single instance, so both are availability bottlenecks.
 - Events are published from service transactions without an outbox, so a database commit and event publication can diverge.
-- Payment, delivery assignment, and order state form a distributed workflow without a saga or compensation mechanism.
+- Payment is synchronous; delivery assignment is event-driven (choreography saga). There is no compensation mechanism if delivery assignment fails after payment succeeds.
 - Internal service ports are reachable inside the deployment network; network policies and service-level authorization would be needed for stronger isolation.
 
 ## Deployment Modes
