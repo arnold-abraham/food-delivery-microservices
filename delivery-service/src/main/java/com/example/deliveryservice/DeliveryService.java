@@ -2,6 +2,8 @@ package com.example.deliveryservice;
 
 import com.example.deliveryservice.http.CorrelationIdHolder;
 import com.example.deliveryservice.kafka.DeliveryEventsPublisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -10,6 +12,8 @@ import java.util.Optional;
 
 @Service
 public class DeliveryService {
+
+    private static final Logger log = LoggerFactory.getLogger(DeliveryService.class);
 
     private final DeliveryRepository repository;
     private final DeliveryEventsPublisher eventsPublisher;
@@ -33,6 +37,12 @@ public class DeliveryService {
 
     @Transactional
     public Delivery createAssignment(Long orderId, Long driverId) {
+        Optional<Delivery> existing = repository.findFirstByOrderId(orderId);
+        if (existing.isPresent()) {
+            log.debug("Delivery already exists for orderId={}, skipping duplicate assignment", orderId);
+            return existing.get();
+        }
+
         Delivery saved = repository.save(new Delivery(orderId, driverId, DeliveryStatus.ASSIGNED.name()));
 
         try {
