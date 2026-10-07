@@ -22,6 +22,7 @@ flowchart LR
         orderdb[("orderdb")]
         outbox[("outbox_events<br/>order-service")]
         deliverydb[("deliverydb")]
+        deliveryOutbox[("outbox_events<br/>delivery-service")]
     end
 
     subgraph events["Async Events · Kafka KRaft"]
@@ -59,6 +60,8 @@ flowchart LR
     order -->|"write<br/>(same tx)"| outbox
     outbox --- orderdb
     delivery --- deliverydb
+    delivery -->|"write<br/>(same tx)"| deliveryOutbox
+    deliveryOutbox --- deliverydb
     userdb --- postgres
     restaurantdb --- postgres
     orderdb --- postgres
@@ -68,8 +71,8 @@ flowchart LR
     outbox -.->|"relay"| paid
     payment -.->|"publish"| requested
     payment -.->|"publish"| completed
-    delivery -.->|"publish on assignment"| assigned
-    delivery -.->|"publish on status update"| status
+    deliveryOutbox -.->|"relay"| assigned
+    deliveryOutbox -.->|"relay"| status
 
     placed --> kafka
     paid --> kafka
@@ -103,7 +106,7 @@ flowchart LR
 
     class client,ingress,gateway edge
     class user,restaurant,order,payment,delivery,statusListener,paymentListener,orderPaidListener,riderAssignedListener service
-    class postgres,userdb,restaurantdb,orderdb,outbox,deliverydb database
+    class postgres,userdb,restaurantdb,orderdb,outbox,deliverydb,deliveryOutbox database
     class kafka broker
     class placed,requested,completed,assigned,status,paid event
     class prometheus,grafana ops
@@ -134,7 +137,7 @@ Solid arrows are synchronous HTTP or persistence relationships. Dashed arrows ar
 | `restaurant-service` | 8082 | `restaurantdb` | — |
 | `order-service` | 8083 | `orderdb` + `outbox_events` | Publishes `order.placed.v1` and `order.paid.v1` via outbox relay; consumes `payment.completed.v1`, `delivery.rider.assigned.v1`, and `delivery.status.changed.v1` |
 | `payment-service` | 8084 | Stateless (no DB) | Publishes `payment.requested.v1` and `payment.completed.v1` |
-| `delivery-service` | 8086 | `deliverydb` | Publishes `delivery.rider.assigned.v1` and `delivery.status.changed.v1`; consumes `order.paid.v1` |
+| `delivery-service` | 8086 | `deliverydb` + `outbox_events` | Publishes `delivery.rider.assigned.v1` and `delivery.status.changed.v1` via outbox relay; consumes `order.paid.v1` |
 
 The four service databases are separate PostgreSQL databases hosted by one PostgreSQL 15 instance. Services access one another by Compose/Kubernetes DNS names; clients use only the gateway.
 
@@ -158,7 +161,7 @@ This diagram reflects the architecture that is implemented today. It is a sound 
 For production scale, the main follow-up concerns are deliberate trade-offs rather than missing components:
 
 - Kafka is single-node and PostgreSQL is a single instance, so both are availability bottlenecks.
-- `order-service` uses a transactional outbox (`outbox_events` table + `OutboxRelay` scheduler) so its event publications are atomic with DB commits. `delivery-service` publishes events best-effort (no outbox yet), so a DB commit and event publication can still diverge there.
+- Both `order-service` and `delivery-service` use a transactional outbox (`outbox_events` table + `OutboxRelay` scheduler), so event publications are atomic with DB commits. `payment-service` is stateless (no DB), so the outbox pattern does not apply.
 - Payment is synchronous; delivery assignment is event-driven (choreography saga). There is no compensation mechanism if delivery assignment fails after payment succeeds.
 - Internal service ports are reachable inside the deployment network; network policies and service-level authorization would be needed for stronger isolation.
 

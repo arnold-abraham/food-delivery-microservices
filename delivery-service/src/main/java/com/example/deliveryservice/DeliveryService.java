@@ -44,13 +44,7 @@ public class DeliveryService {
         }
 
         Delivery saved = repository.save(new Delivery(orderId, driverId, DeliveryStatus.ASSIGNED.name()));
-
-        try {
-            eventsPublisher.publishRiderAssigned(saved.getId(), saved.getOrderId(), saved.getDriverId(), CorrelationIdHolder.currentOrNull());
-        } catch (Exception ex) {
-            // swallow; assignment is already persisted
-        }
-
+        eventsPublisher.publishRiderAssigned(saved.getId(), saved.getOrderId(), saved.getDriverId(), CorrelationIdHolder.currentOrNull());
         return saved;
     }
 
@@ -65,14 +59,7 @@ public class DeliveryService {
             }
             d.setStatus(next.name());
             Delivery saved = repository.save(d);
-
-            // best-effort event publish (avoid failing user request if Kafka is temporarily down)
-            try {
-                eventsPublisher.publishStatusChanged(saved.getId(), saved.getOrderId(), saved.getStatus(), CorrelationIdHolder.currentOrNull());
-            } catch (Exception ex) {
-                // swallow; delivery status is already persisted
-            }
-
+            eventsPublisher.publishStatusChanged(saved.getId(), saved.getOrderId(), saved.getStatus(), CorrelationIdHolder.currentOrNull());
             return saved;
         });
     }

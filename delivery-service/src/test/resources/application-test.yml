@@ -23,4 +23,5 @@ spring:
 
 app:
   kafka:
+    enabled: false
     send-timeout-ms: 1
