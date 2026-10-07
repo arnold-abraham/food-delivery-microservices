@@ -1,88 +1,84 @@
 package com.example.orderservice.kafka;
 
-import com.example.contracts.events.OrderPaidEvent;
-import com.example.contracts.events.OrderPlacedEvent;
 import com.example.contracts.topics.OrderKafkaTopics;
+import com.example.orderservice.outbox.OutboxEvent;
+import com.example.orderservice.outbox.OutboxRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.kafka.core.KafkaTemplate;
-
-import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 class OrderEventsPublisherTest {
 
-    @SuppressWarnings("unchecked")
-    private final KafkaTemplate<String, Object> kafkaTemplate = mock(KafkaTemplate.class);
+    private OutboxRepository outboxRepository;
+    private ObjectMapper objectMapper;
     private OrderEventsPublisher publisher;
 
     @BeforeEach
     void setUp() {
-        publisher = new OrderEventsPublisher(kafkaTemplate, 200, true);
-        when(kafkaTemplate.send(anyString(), anyString(), any()))
-                .thenReturn(CompletableFuture.completedFuture(null));
+        outboxRepository = mock(OutboxRepository.class);
+        objectMapper = new ObjectMapper().findAndRegisterModules();
+        publisher = new OrderEventsPublisher(outboxRepository, objectMapper, true);
+        when(outboxRepository.save(any(OutboxEvent.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 
     @Test
-    void publishOrderPlaced_sendsToCorrectTopic() {
+    void publishOrderPlaced_savesOutboxEventWithCorrectTopic() throws Exception {
         publisher.publishOrderPlaced(1L, 2L, 3L);
 
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
-        verify(kafkaTemplate).send(eq(OrderKafkaTopics.ORDER_PLACED), eq("1"), captor.capture());
+        ArgumentCaptor<OutboxEvent> captor = ArgumentCaptor.forClass(OutboxEvent.class);
+        verify(outboxRepository).save(captor.capture());
 
-        OrderPlacedEvent event = (OrderPlacedEvent) captor.getValue();
-        assertThat(event.orderId()).isEqualTo(1L);
-        assertThat(event.userId()).isEqualTo(2L);
-        assertThat(event.restaurantId()).isEqualTo(3L);
-        assertThat(event.eventVersion()).isEqualTo(OrderPlacedEvent.VERSION);
-        assertThat(event.createdAt()).isNotNull();
+        OutboxEvent saved = captor.getValue();
+        assertThat(saved.getTopic()).isEqualTo(OrderKafkaTopics.ORDER_PLACED);
+        assertThat(saved.getEventKey()).isEqualTo("1");
+
+        JsonNode node = objectMapper.readTree(saved.getPayload());
+        assertThat(node.get("orderId").asLong()).isEqualTo(1L);
+        assertThat(node.get("userId").asLong()).isEqualTo(2L);
+        assertThat(node.get("restaurantId").asLong()).isEqualTo(3L);
+        assertThat(node.get("eventVersion").asInt()).isEqualTo(1);
     }
 
     @Test
-    void publishOrderPaid_sendsToCorrectTopic() {
+    void publishOrderPaid_savesOutboxEventWithCorrectTopic() throws Exception {
         publisher.publishOrderPaid(10L, 20L);
 
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
-        verify(kafkaTemplate).send(eq(OrderKafkaTopics.ORDER_PAID), eq("10"), captor.capture());
+        ArgumentCaptor<OutboxEvent> captor = ArgumentCaptor.forClass(OutboxEvent.class);
+        verify(outboxRepository).save(captor.capture());
 
-        OrderPaidEvent event = (OrderPaidEvent) captor.getValue();
-        assertThat(event.orderId()).isEqualTo(10L);
-        assertThat(event.driverId()).isEqualTo(20L);
-        assertThat(event.eventVersion()).isEqualTo(OrderPaidEvent.VERSION);
-        assertThat(event.createdAt()).isNotNull();
+        OutboxEvent saved = captor.getValue();
+        assertThat(saved.getTopic()).isEqualTo(OrderKafkaTopics.ORDER_PAID);
+        assertThat(saved.getEventKey()).isEqualTo("10");
+
+        JsonNode node = objectMapper.readTree(saved.getPayload());
+        assertThat(node.get("orderId").asLong()).isEqualTo(10L);
+        assertThat(node.get("driverId").asLong()).isEqualTo(20L);
     }
 
     @Test
-    void publishOrderPlaced_swallowsKafkaFailure() {
-        when(kafkaTemplate.send(anyString(), anyString(), any()))
-                .thenThrow(new RuntimeException("Kafka unavailable"));
-
-        assertThatNoException().isThrownBy(() -> publisher.publishOrderPlaced(1L, 2L, 3L));
-    }
-
-    @Test
-    void publishOrderPaid_swallowsKafkaFailure() {
-        when(kafkaTemplate.send(anyString(), anyString(), any()))
-                .thenThrow(new RuntimeException("Kafka unavailable"));
-
-        assertThatNoException().isThrownBy(() -> publisher.publishOrderPaid(10L, 20L));
-    }
-
-    @Test
-    void doesNotSendWhenDisabled() {
-        OrderEventsPublisher disabled = new OrderEventsPublisher(kafkaTemplate, 200, false);
+    void doesNotSaveWhenDisabled() {
+        OrderEventsPublisher disabled = new OrderEventsPublisher(outboxRepository, objectMapper, false);
 
         disabled.publishOrderPlaced(1L, 2L, 3L);
         disabled.publishOrderPaid(10L, 20L);
 
-        verifyNoInteractions(kafkaTemplate);
+        verifyNoInteractions(outboxRepository);
+    }
+
+    @Test
+    void publishOrderPlaced_gracefulOnSerializationFailure() throws Exception {
+        ObjectMapper broken = mock(ObjectMapper.class);
+        when(broken.writeValueAsString(any())).thenThrow(new JsonProcessingException("boom") {});
+        OrderEventsPublisher pub = new OrderEventsPublisher(outboxRepository, broken, true);
+
+        assertThatNoException().isThrownBy(() -> pub.publishOrderPlaced(1L, 2L, 3L));
     }
 }
