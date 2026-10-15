@@ -8,7 +8,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -25,9 +24,6 @@ public class OrderService {
 
     @Value("${order.delivery-service-url:http://delivery-service:8086}")
     private String deliveryServiceBaseUrl;
-
-    @Value("${order.user-service-url:http://user-service:8081}")
-    private String userServiceBaseUrl;
 
     @Value("${order.restaurant-service-url:http://restaurant-service:8082}")
     private String restaurantServiceBaseUrl;
@@ -95,10 +91,6 @@ public class OrderService {
     public Optional<Order> pay(Long orderId, double amount, Long driverId) {
         return repository.findById(orderId).map(order -> {
             double expectedAmount = order.getTotalAmount() != null ? order.getTotalAmount() : 0.0;
-            BigDecimal amountBd = BigDecimal.valueOf(amount);
-            BigDecimal expectedBd = BigDecimal.valueOf(expectedAmount);
-
-            eventsPublisher.publishPaymentRequested(order.getId(), amountBd, expectedBd);
 
             String paymentUrl = paymentServiceBaseUrl + "/payments";
             Map<String, Object> paymentRequest = Map.of(
@@ -111,47 +103,18 @@ public class OrderService {
             boolean paymentSuccess = paymentResponse != null &&
                     "SUCCESS".equalsIgnoreCase(String.valueOf(paymentResponse.get("status")));
 
-            eventsPublisher.publishPaymentCompleted(order.getId(), amountBd, expectedBd,
-                    paymentSuccess ? "SUCCESS" : "FAILED");
-
             if (!paymentSuccess) {
                 order.setStatus("FAILED");
                 return repository.save(order);
             }
 
-            // Assign delivery BEFORE persisting PAID status. If delivery creation fails the
-            // transaction rolls back and the order stays PENDING, keeping it retryable.
-            // Known trade-off: the payment service has already charged the amount; full
-            // compensation requires a saga pattern beyond the current MVP scope.
-            Long effectiveDriverId = driverId != null ? driverId : 1L;
-
-            String userUrl = userServiceBaseUrl + "/users/" + effectiveDriverId;
-            try {
-                restTemplate.getForObject(userUrl, Map.class);
-            } catch (HttpClientErrorException ex) {
-                if (ex.getStatusCode() == HttpStatus.NOT_FOUND) {
-                    throw new IllegalArgumentException("driverId not found: " + effectiveDriverId);
-                }
-                throw ex;
-            }
-
-            String deliveryUrl = deliveryServiceBaseUrl + "/deliveries";
-            Map<String, Object> deliveryRequest = Map.of(
-                    "orderId", order.getId(),
-                    "driverId", effectiveDriverId
-            );
-            Map<?, ?> delivery = restTemplate.postForObject(deliveryUrl, deliveryRequest, Map.class);
-
-            // Delivery confirmed — now atomically persist PAID + delivery status in one save.
             order.setStatus("PAID");
-            order.setDeliveryStatus(delivery != null && delivery.get("status") != null
-                    ? String.valueOf(delivery.get("status")) : "ASSIGNED");
             Order saved = repository.save(order);
 
-            if (delivery != null && delivery.get("id") != null) {
-                long deliveryId = Long.parseLong(String.valueOf(delivery.get("id")));
-                eventsPublisher.publishRiderAssigned(saved.getId(), deliveryId, effectiveDriverId);
-            }
+            // Delivery assignment is now event-driven: publish order.paid.v1 and let
+            // delivery-service create the assignment asynchronously.
+            long effectiveDriverId = driverId != null ? driverId : 1L;
+            eventsPublisher.publishOrderPaid(saved.getId(), effectiveDriverId);
 
             return saved;
         });

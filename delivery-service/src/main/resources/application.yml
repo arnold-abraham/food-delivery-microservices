@@ -11,6 +11,15 @@ spring:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       properties:
         spring.json.add.type.headers: false
+    consumer:
+      group-id: delivery-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: com.example.contracts.events
+        spring.json.use.type.headers: false
+        spring.json.value.default.type: com.example.contracts.events.OrderPaidEvent
   datasource:
     url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:deliverydb}
     username: ${DB_USER:food}

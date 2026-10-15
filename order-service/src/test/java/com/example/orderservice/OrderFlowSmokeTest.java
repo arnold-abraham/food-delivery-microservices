@@ -51,16 +51,6 @@ class OrderFlowSmokeTest {
                 .andExpect(method(org.springframework.http.HttpMethod.POST))
                 .andRespond(withSuccess("{\"orderId\":1,\"status\":\"SUCCESS\",\"message\":\"Payment accepted\"}", MediaType.APPLICATION_JSON));
 
-        // user-service: driver exists
-        mockServer.expect(requestTo("http://localhost/users/5"))
-                .andExpect(method(org.springframework.http.HttpMethod.GET))
-                .andRespond(withSuccess("{\"id\":5,\"name\":\"Driver\"}", MediaType.APPLICATION_JSON));
-
-        // delivery-service: create assignment
-        mockServer.expect(requestTo("http://localhost/deliveries"))
-                .andExpect(method(org.springframework.http.HttpMethod.POST))
-                .andRespond(withSuccess("{\"id\":99,\"orderId\":1,\"driverId\":5,\"status\":\"ASSIGNED\"}", MediaType.APPLICATION_JSON));
-
         // Create order with items
         String createJson = "{\"userId\":2,\"restaurantId\":1,\"items\":[{\"menuItemId\":10,\"quantity\":2}]}";
 
@@ -81,8 +71,7 @@ class OrderFlowSmokeTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payJson))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("PAID"))
-                .andExpect(jsonPath("$.deliveryStatus").value("ASSIGNED"));
+                .andExpect(jsonPath("$.status").value("PAID"));
 
         mockServer.verify();
     }
