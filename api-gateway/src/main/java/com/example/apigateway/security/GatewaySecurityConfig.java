@@ -22,6 +22,9 @@ public class GatewaySecurityConfig {
                         // Prometheus scraping + actuator endpoints (no auth)
                         .pathMatchers("/actuator/**").permitAll()
 
+                        // CORS preflight — must be permitted before authentication runs
+                        .pathMatchers(HttpMethod.OPTIONS).permitAll()
+
                         // auth endpoints live in user-service behind gateway routing
                         .pathMatchers(HttpMethod.POST, "/auth/register", "/auth/login").permitAll()
 
