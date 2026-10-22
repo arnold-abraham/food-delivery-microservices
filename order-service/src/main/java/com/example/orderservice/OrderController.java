@@ -6,6 +6,8 @@ import jakarta.validation.constraints.NotNull;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Objects;
+
 import java.util.List;
 import java.util.Map;
 
@@ -30,8 +32,7 @@ public class OrderController {
     ) {}
 
     public record PayOrderRequest(
-            @NotNull(message = "amount is required") @Min(value = 1, message = "amount must be >= 1") Double amount,
-            @Min(value = 1, message = "driverId must be >= 1") Long driverId
+            @NotNull(message = "amount is required") @Min(value = 1, message = "amount must be >= 1") Double amount
     ) {}
 
     public record OrderItemResponse(Long menuItemId, int quantity, double unitPrice, double lineTotal) {}
@@ -69,13 +70,19 @@ public class OrderController {
     }
 
     @GetMapping
-    public List<OrderResponse> list() {
-        return service.listAll().stream().map(this::toResponse).toList();
+    public List<OrderResponse> list(
+            @RequestHeader(value = "X-User-Id", required = false) Long userId,
+            @RequestHeader(value = "X-User-Roles", required = false) String roles) {
+        boolean isAdmin = roles != null && roles.contains("ADMIN");
+        List<Order> orders = isAdmin
+                ? service.listAll()
+                : service.listByUserId(Objects.requireNonNullElse(userId, -1L));
+        return orders.stream().map(this::toResponse).toList();
     }
 
     @PostMapping("/{id}/pay")
     public ResponseEntity<?> pay(@PathVariable Long id, @Valid @RequestBody PayOrderRequest req) {
-        return service.pay(id, req.amount(), req.driverId())
+        return service.pay(id, req.amount(), null)
                 .<ResponseEntity<?>>map(o -> ResponseEntity.ok(toResponse(o)))
                 .orElseGet(() -> ResponseEntity.status(404).body(Map.of("error", "Order not found")));
     }

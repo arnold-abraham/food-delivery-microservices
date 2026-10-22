@@ -53,21 +53,11 @@ class OrderControllerValidationTest {
 
     @Test
     void pay_invalidPayload_hasErrorForAmount() {
-        var req = new OrderController.PayOrderRequest(0.0, null);
+        var req = new OrderController.PayOrderRequest(0.0);
 
         var violations = validator.validate(req);
         assertThat(violations)
                 .extracting(v -> v.getPropertyPath().toString())
                 .contains("amount");
-    }
-
-    @Test
-    void pay_invalidDriverId_hasErrorForDriverId() {
-        var req = new OrderController.PayOrderRequest(10.0, 0L);
-
-        var violations = validator.validate(req);
-        assertThat(violations)
-                .extracting(v -> v.getPropertyPath().toString())
-                .contains("driverId");
     }
 }
