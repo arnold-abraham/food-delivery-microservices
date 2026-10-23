@@ -53,12 +53,18 @@ public class OrderController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> get(@PathVariable Long id) {
-        // best-effort: refresh delivery status each time
+    public ResponseEntity<?> get(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-User-Id", required = false) Long callerId,
+            @RequestHeader(value = "X-User-Roles", required = false) String roles) {
         service.syncDeliveryStatus(id);
-
         return service.get(id)
-                .<ResponseEntity<?>>map(o -> ResponseEntity.ok(toResponse(o)))
+                .<ResponseEntity<?>>map(o -> {
+                    if (!isOwnerOrAdmin(o.getUserId(), callerId, roles)) {
+                        return ResponseEntity.status(403).body(Map.of("error", "Access denied"));
+                    }
+                    return ResponseEntity.ok(toResponse(o));
+                })
                 .orElseGet(() -> ResponseEntity.status(404).body(Map.of("error", "Order not found")));
     }
 
@@ -81,10 +87,26 @@ public class OrderController {
     }
 
     @PostMapping("/{id}/pay")
-    public ResponseEntity<?> pay(@PathVariable Long id, @Valid @RequestBody PayOrderRequest req) {
-        return service.pay(id, req.amount(), null)
-                .<ResponseEntity<?>>map(o -> ResponseEntity.ok(toResponse(o)))
+    public ResponseEntity<?> pay(
+            @PathVariable Long id,
+            @Valid @RequestBody PayOrderRequest req,
+            @RequestHeader(value = "X-User-Id", required = false) Long callerId,
+            @RequestHeader(value = "X-User-Roles", required = false) String roles) {
+        return service.get(id)
+                .<ResponseEntity<?>>map(o -> {
+                    if (!isOwnerOrAdmin(o.getUserId(), callerId, roles)) {
+                        return ResponseEntity.status(403).body(Map.of("error", "Access denied"));
+                    }
+                    return service.pay(id, req.amount(), null)
+                            .<ResponseEntity<?>>map(paid -> ResponseEntity.ok(toResponse(paid)))
+                            .orElseGet(() -> ResponseEntity.status(404).body(Map.of("error", "Order not found")));
+                })
                 .orElseGet(() -> ResponseEntity.status(404).body(Map.of("error", "Order not found")));
+    }
+
+    private boolean isOwnerOrAdmin(Long ownerId, Long callerId, String roles) {
+        boolean isAdmin = roles != null && roles.contains("ADMIN");
+        return isAdmin || Objects.equals(ownerId, callerId);
     }
 
     private OrderResponse toResponse(Order o) {
