@@ -22,7 +22,12 @@ public class RestaurantController {
     public RestaurantController(RestaurantService service) { this.service = service; }
 
     @PostMapping
-    public ResponseEntity<RestaurantResponse> create(@Valid @RequestBody CreateRestaurantRequest req) {
+    public ResponseEntity<?> create(
+            @Valid @RequestBody CreateRestaurantRequest req,
+            @RequestHeader(value = "X-User-Roles", required = false) String roles) {
+        if (roles == null || !roles.contains("ADMIN")) {
+            return ResponseEntity.status(403).body(Map.of("error", "Admin access required"));
+        }
         Restaurant r = service.create(req.name(), req.cuisine());
         return ResponseEntity.ok(new RestaurantResponse(r.getId(), r.getName(), r.getCuisine()));
     }

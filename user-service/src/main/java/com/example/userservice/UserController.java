@@ -36,12 +36,17 @@ public class UserController {
     }
 
     @GetMapping
-    public List<UserResponse> list(@RequestParam(required = false) String role) {
+    public ResponseEntity<?> list(
+            @RequestParam(required = false) String role,
+            @RequestHeader(value = "X-User-Roles", required = false) String callerRoles) {
+        if (callerRoles == null || !callerRoles.contains("ADMIN")) {
+            return ResponseEntity.status(403).body(Map.of("error", "Admin access required"));
+        }
         List<User> users = (role != null && !role.isBlank())
                 ? service.listByRole(role)
                 : service.listAll();
-        return users.stream()
+        return ResponseEntity.ok(users.stream()
                 .map(u -> new UserResponse(u.getId(), u.getName(), u.getEmail(), u.getRoles()))
-                .toList();
+                .toList());
     }
 }
