@@ -35,13 +35,12 @@ public class RestaurantController {
     }
 
     @GetMapping
-    public ResponseEntity<?> list(@RequestParam(name = "cuisine", required = false) String cuisine) {
-        if (cuisine == null || cuisine.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "cuisine query param is required"));
-        }
-        List<RestaurantResponse> results = service.listByCuisine(cuisine).stream()
+    public List<RestaurantResponse> list(@RequestParam(name = "cuisine", required = false) String cuisine) {
+        List<Restaurant> restaurants = (cuisine == null || cuisine.isBlank())
+                ? service.list()
+                : service.listByCuisine(cuisine);
+        return restaurants.stream()
                 .map(r -> new RestaurantResponse(r.getId(), r.getName(), r.getCuisine()))
                 .toList();
-        return ResponseEntity.ok(results);
     }
 }
