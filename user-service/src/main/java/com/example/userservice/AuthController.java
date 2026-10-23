@@ -38,10 +38,16 @@ public class AuthController {
             @NotBlank(message = "password is required") String password
     ) {}
 
+    private static final List<String> PRIVILEGED_ROLES = List.of("ADMIN", "DRIVER");
+
     @PostMapping("/register")
-    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest req) {
+    public ResponseEntity<?> register(
+            @Valid @RequestBody RegisterRequest req,
+            @RequestHeader(value = "X-User-Roles", required = false) String callerRoles) {
+        boolean callerIsAdmin = callerRoles != null && callerRoles.contains("ADMIN");
+        String roles = resolveRoles(req.roles(), callerIsAdmin);
         try {
-            User created = userService.register(req.name(), req.email(), req.password(), req.roles());
+            User created = userService.register(req.name(), req.email(), req.password(), roles);
             return ResponseEntity.ok(Map.of(
                     "id", created.getId(),
                     "name", created.getName(),
@@ -51,6 +57,19 @@ public class AuthController {
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
         }
+    }
+
+    private String resolveRoles(String requested, boolean callerIsAdmin) {
+        if (callerIsAdmin) {
+            return (requested == null || requested.isBlank()) ? "CUSTOMER" : requested;
+        }
+        // Non-admin callers: strip any privileged roles, default to CUSTOMER
+        if (requested == null || requested.isBlank()) return "CUSTOMER";
+        List<String> allowed = Arrays.stream(requested.split(","))
+                .map(String::trim)
+                .filter(r -> !r.isBlank() && !PRIVILEGED_ROLES.contains(r.toUpperCase()))
+                .toList();
+        return allowed.isEmpty() ? "CUSTOMER" : String.join(",", allowed);
     }
 
     @PostMapping("/login")
