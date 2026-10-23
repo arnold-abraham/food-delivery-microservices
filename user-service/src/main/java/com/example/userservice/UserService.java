@@ -42,4 +42,6 @@ public class UserService {
     public Optional<User> findByEmail(String email) { return repository.findByEmailIgnoreCase(email); }
 
     public List<User> listAll() { return repository.findAll(); }
+
+    public List<User> listByRole(String role) { return repository.findByRolesContaining(role); }
 }

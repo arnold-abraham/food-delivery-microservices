@@ -36,6 +36,9 @@ out/
 # Node (if any microservices use Node)
 node_modules/
 
+# Frontend — developed separately, not tracked in this repo
+frontend/
+
 # Other build artifacts
 *.original
 

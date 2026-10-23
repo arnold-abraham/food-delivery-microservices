@@ -30,8 +30,8 @@ public class DeliveryController {
     }
 
     @GetMapping
-    public List<Delivery> listAll() {
-        return service.listAll();
+    public List<Delivery> list(@RequestParam(required = false) Long driverId) {
+        return driverId != null ? service.listByDriverId(driverId) : service.listAll();
     }
 
     @GetMapping("/{id}")

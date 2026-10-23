@@ -19,6 +19,7 @@ public class OutboxKafkaConfig {
     @Bean("outboxKafkaTemplate")
     public KafkaTemplate<String, String> outboxKafkaTemplate(KafkaProperties properties) {
         Map<String, Object> config = new HashMap<>(properties.getProducer().buildProperties(null));
+        config.putIfAbsent(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, properties.getBootstrapServers());
         config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         return new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(config));

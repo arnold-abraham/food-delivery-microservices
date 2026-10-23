@@ -35,6 +35,10 @@ public class DeliveryService {
         return repository.findAll();
     }
 
+    public List<Delivery> listByDriverId(Long driverId) {
+        return repository.findByDriverId(driverId);
+    }
+
     @Transactional
     public Delivery createAssignment(Long orderId, Long driverId) {
         Optional<Delivery> existing = repository.findFirstByOrderId(orderId);

@@ -2,15 +2,17 @@ package com.example.orderservice;
 
 import com.example.orderservice.kafka.OrderEventsPublisher;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Random;
 
 @Service
 public class OrderService {
@@ -27,6 +29,11 @@ public class OrderService {
 
     @Value("${order.restaurant-service-url:http://restaurant-service:8082}")
     private String restaurantServiceBaseUrl;
+
+    @Value("${order.user-service-url:http://user-service:8081}")
+    private String userServiceBaseUrl;
+
+    private final Random random = new Random();
 
     public OrderService(OrderRepository repository,
                         OrderItemRepository orderItemRepository,
@@ -83,6 +90,10 @@ public class OrderService {
         return repository.findAll();
     }
 
+    public List<Order> listByUserId(Long userId) {
+        return repository.findByUserId(userId);
+    }
+
     public List<OrderItem> getItems(Long orderId) {
         return orderItemRepository.findByOrderId(orderId);
     }
@@ -111,9 +122,7 @@ public class OrderService {
             order.setStatus("PAID");
             Order saved = repository.save(order);
 
-            // Delivery assignment is now event-driven: publish order.paid.v1 and let
-            // delivery-service create the assignment asynchronously.
-            long effectiveDriverId = driverId != null ? driverId : 1L;
+            long effectiveDriverId = driverId != null ? driverId : pickRandomDriver();
             eventsPublisher.publishOrderPaid(saved.getId(), effectiveDriverId);
 
             return saved;
@@ -134,11 +143,9 @@ public class OrderService {
                     }
                     return repository.save(order);
                 }
-            } catch (HttpClientErrorException ex) {
-                if (ex.getStatusCode() == HttpStatus.NOT_FOUND) {
-                    return order;
-                }
-                throw ex;
+            } catch (RestClientException ex) {
+                // best-effort: delivery service may be unavailable or no assignment yet
+                return order;
             }
             return order;
         });
@@ -148,6 +155,24 @@ public class OrderService {
     @Transactional
     public Optional<Order> pay(Long orderId, double amount) {
         return pay(orderId, amount, null);
+    }
+
+    private long pickRandomDriver() {
+        try {
+            String url = userServiceBaseUrl + "/users?role=DRIVER";
+            List<Map<String, Object>> drivers = restTemplate.exchange(
+                    url, HttpMethod.GET, null,
+                    new ParameterizedTypeReference<List<Map<String, Object>>>() {}
+            ).getBody();
+            if (drivers != null && !drivers.isEmpty()) {
+                Map<String, Object> picked = drivers.get(random.nextInt(drivers.size()));
+                Object id = picked.get("id");
+                if (id instanceof Number n) return n.longValue();
+            }
+        } catch (RestClientException ex) {
+            // user-service unavailable — fall back to ID 1
+        }
+        return 1L;
     }
 
     public record CreateOrderItem(Long menuItemId, int quantity) {}

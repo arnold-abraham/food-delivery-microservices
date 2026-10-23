@@ -17,7 +17,7 @@ public class UserController {
             @NotBlank(message = "email is required") @Email(message = "email must be valid") String email
     ) {}
 
-    public record UserResponse(Long id, String name, String email) {}
+    public record UserResponse(Long id, String name, String email, String roles) {}
 
     private final UserService service;
     public UserController(UserService service) { this.service = service; }
@@ -25,20 +25,23 @@ public class UserController {
     @PostMapping
     public ResponseEntity<UserResponse> create(@Valid @RequestBody CreateUserRequest req) {
         User created = service.create(req.name(), req.email());
-        return ResponseEntity.ok(new UserResponse(created.getId(), created.getName(), created.getEmail()));
+        return ResponseEntity.ok(new UserResponse(created.getId(), created.getName(), created.getEmail(), created.getRoles()));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<?> get(@PathVariable Long id) {
         return service.get(id)
-                .<ResponseEntity<?>>map(u -> ResponseEntity.ok(new UserResponse(u.getId(), u.getName(), u.getEmail())))
+                .<ResponseEntity<?>>map(u -> ResponseEntity.ok(new UserResponse(u.getId(), u.getName(), u.getEmail(), u.getRoles())))
                 .orElseGet(() -> ResponseEntity.status(404).body(Map.of("error", "User not found")));
     }
 
     @GetMapping
-    public List<UserResponse> list() {
-        return service.listAll().stream()
-                .map(u -> new UserResponse(u.getId(), u.getName(), u.getEmail()))
+    public List<UserResponse> list(@RequestParam(required = false) String role) {
+        List<User> users = (role != null && !role.isBlank())
+                ? service.listByRole(role)
+                : service.listAll();
+        return users.stream()
+                .map(u -> new UserResponse(u.getId(), u.getName(), u.getEmail(), u.getRoles()))
                 .toList();
     }
 }
