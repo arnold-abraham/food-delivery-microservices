@@ -3,6 +3,8 @@ package com.example.orderservice;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -39,26 +41,40 @@ public class OrderController {
 
     public record OrderResponse(Long id, Long userId, Long restaurantId, String status, Double totalAmount, String deliveryStatus, List<OrderItemResponse> items) {}
 
+    public record PageResponse<T>(List<T> content, int page, int size, long totalElements, int totalPages) {}
+
     private final OrderService service;
     public OrderController(OrderService service) { this.service = service; }
 
     @PostMapping
-    public ResponseEntity<OrderResponse> create(@Valid @RequestBody CreateOrderRequest req) {
+    public ResponseEntity<?> create(
+            @Valid @RequestBody CreateOrderRequest req,
+            @RequestHeader(value = "X-User-Id", required = false) Long callerId,
+            @RequestHeader(value = "X-User-Roles", required = false) String roles) {
+        boolean isAdmin = roles != null && roles.contains("ADMIN");
+        if (!isAdmin && !req.userId().equals(callerId)) {
+            return ResponseEntity.status(403).body(Map.of("error", "Cannot place order on behalf of another user"));
+        }
         List<OrderService.CreateOrderItem> items = req.items() == null ? List.of() : req.items().stream()
                 .map(i -> new OrderService.CreateOrderItem(i.menuItemId(), i.quantity()))
                 .toList();
-
         Order o = service.create(req.userId(), req.restaurantId(), items);
         return ResponseEntity.ok(toResponse(o));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> get(@PathVariable Long id) {
-        // best-effort: refresh delivery status each time
+    public ResponseEntity<?> get(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-User-Id", required = false) Long callerId,
+            @RequestHeader(value = "X-User-Roles", required = false) String roles) {
         service.syncDeliveryStatus(id);
-
         return service.get(id)
-                .<ResponseEntity<?>>map(o -> ResponseEntity.ok(toResponse(o)))
+                .<ResponseEntity<?>>map(o -> {
+                    if (!isOwnerOrAdmin(o.getUserId(), callerId, roles)) {
+                        return ResponseEntity.status(403).body(Map.of("error", "Access denied"));
+                    }
+                    return ResponseEntity.ok(toResponse(o));
+                })
                 .orElseGet(() -> ResponseEntity.status(404).body(Map.of("error", "Order not found")));
     }
 
@@ -70,21 +86,42 @@ public class OrderController {
     }
 
     @GetMapping
-    public List<OrderResponse> list(
+    public PageResponse<OrderResponse> list(
             @RequestHeader(value = "X-User-Id", required = false) Long userId,
-            @RequestHeader(value = "X-User-Roles", required = false) String roles) {
+            @RequestHeader(value = "X-User-Roles", required = false) String roles,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
         boolean isAdmin = roles != null && roles.contains("ADMIN");
-        List<Order> orders = isAdmin
-                ? service.listAll()
-                : service.listByUserId(Objects.requireNonNullElse(userId, -1L));
-        return orders.stream().map(this::toResponse).toList();
+        var pageable = PageRequest.of(page, size);
+        Page<Order> result = isAdmin
+                ? service.listAll(pageable)
+                : service.listByUserId(Objects.requireNonNullElse(userId, -1L), pageable);
+        List<OrderResponse> content = result.getContent().stream().map(this::toResponse).toList();
+        return new PageResponse<>(content, result.getNumber(), result.getSize(),
+                result.getTotalElements(), result.getTotalPages());
     }
 
     @PostMapping("/{id}/pay")
-    public ResponseEntity<?> pay(@PathVariable Long id, @Valid @RequestBody PayOrderRequest req) {
-        return service.pay(id, req.amount(), null)
-                .<ResponseEntity<?>>map(o -> ResponseEntity.ok(toResponse(o)))
+    public ResponseEntity<?> pay(
+            @PathVariable Long id,
+            @Valid @RequestBody PayOrderRequest req,
+            @RequestHeader(value = "X-User-Id", required = false) Long callerId,
+            @RequestHeader(value = "X-User-Roles", required = false) String roles) {
+        return service.get(id)
+                .<ResponseEntity<?>>map(o -> {
+                    if (!isOwnerOrAdmin(o.getUserId(), callerId, roles)) {
+                        return ResponseEntity.status(403).body(Map.of("error", "Access denied"));
+                    }
+                    return service.pay(id, req.amount(), null)
+                            .<ResponseEntity<?>>map(paid -> ResponseEntity.ok(toResponse(paid)))
+                            .orElseGet(() -> ResponseEntity.status(404).body(Map.of("error", "Order not found")));
+                })
                 .orElseGet(() -> ResponseEntity.status(404).body(Map.of("error", "Order not found")));
+    }
+
+    private boolean isOwnerOrAdmin(Long ownerId, Long callerId, String roles) {
+        boolean isAdmin = roles != null && roles.contains("ADMIN");
+        return isAdmin || Objects.equals(ownerId, callerId);
     }
 
     private OrderResponse toResponse(Order o) {

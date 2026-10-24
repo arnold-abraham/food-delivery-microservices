@@ -28,10 +28,14 @@ public class MenuController {
     }
 
     @PostMapping
-    public ResponseEntity<MenuItemResponse> create(
+    public ResponseEntity<?> create(
             @PathVariable Long restaurantId,
-            @Valid @RequestBody CreateMenuItemRequest req
+            @Valid @RequestBody CreateMenuItemRequest req,
+            @RequestHeader(value = "X-User-Roles", required = false) String roles
     ) {
+        if (roles == null || !roles.contains("ADMIN")) {
+            return ResponseEntity.status(403).body(Map.of("error", "Admin access required"));
+        }
         MenuItem created = service.create(restaurantId, req.name(), req.price());
         return ResponseEntity.ok(new MenuItemResponse(created.getId(), created.getRestaurantId(), created.getName(), created.getPrice()));
     }
