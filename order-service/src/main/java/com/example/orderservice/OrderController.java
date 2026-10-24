@@ -3,6 +3,8 @@ package com.example.orderservice;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -38,6 +40,8 @@ public class OrderController {
     public record OrderItemResponse(Long menuItemId, int quantity, double unitPrice, double lineTotal) {}
 
     public record OrderResponse(Long id, Long userId, Long restaurantId, String status, Double totalAmount, String deliveryStatus, List<OrderItemResponse> items) {}
+
+    public record PageResponse<T>(List<T> content, int page, int size, long totalElements, int totalPages) {}
 
     private final OrderService service;
     public OrderController(OrderService service) { this.service = service; }
@@ -82,14 +86,19 @@ public class OrderController {
     }
 
     @GetMapping
-    public List<OrderResponse> list(
+    public PageResponse<OrderResponse> list(
             @RequestHeader(value = "X-User-Id", required = false) Long userId,
-            @RequestHeader(value = "X-User-Roles", required = false) String roles) {
+            @RequestHeader(value = "X-User-Roles", required = false) String roles,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
         boolean isAdmin = roles != null && roles.contains("ADMIN");
-        List<Order> orders = isAdmin
-                ? service.listAll()
-                : service.listByUserId(Objects.requireNonNullElse(userId, -1L));
-        return orders.stream().map(this::toResponse).toList();
+        var pageable = PageRequest.of(page, size);
+        Page<Order> result = isAdmin
+                ? service.listAll(pageable)
+                : service.listByUserId(Objects.requireNonNullElse(userId, -1L), pageable);
+        List<OrderResponse> content = result.getContent().stream().map(this::toResponse).toList();
+        return new PageResponse<>(content, result.getNumber(), result.getSize(),
+                result.getTotalElements(), result.getTotalPages());
     }
 
     @PostMapping("/{id}/pay")

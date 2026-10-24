@@ -7,7 +7,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import java.util.Optional;
 
 @Service
@@ -31,12 +33,12 @@ public class DeliveryService {
         return repository.findFirstByOrderId(orderId);
     }
 
-    public List<Delivery> listAll() {
-        return repository.findAll();
+    public Page<Delivery> listAll(Pageable pageable) {
+        return repository.findAll(pageable);
     }
 
-    public List<Delivery> listByDriverId(Long driverId) {
-        return repository.findByDriverId(driverId);
+    public Page<Delivery> listByDriverId(Long driverId, Pageable pageable) {
+        return repository.findByDriverId(driverId, pageable);
     }
 
     @Transactional

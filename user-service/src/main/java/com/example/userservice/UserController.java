@@ -3,6 +3,8 @@ package com.example.userservice;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,6 +20,8 @@ public class UserController {
     ) {}
 
     public record UserResponse(Long id, String name, String email, String roles) {}
+
+    public record PageResponse<T>(List<T> content, int page, int size, long totalElements, int totalPages) {}
 
     private final UserService service;
     public UserController(UserService service) { this.service = service; }
@@ -45,15 +49,20 @@ public class UserController {
     @GetMapping
     public ResponseEntity<?> list(
             @RequestParam(required = false) String role,
-            @RequestHeader(value = "X-User-Roles", required = false) String callerRoles) {
+            @RequestHeader(value = "X-User-Roles", required = false) String callerRoles,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
         if (callerRoles == null || !callerRoles.contains("ADMIN")) {
             return ResponseEntity.status(403).body(Map.of("error", "Admin access required"));
         }
-        List<User> users = (role != null && !role.isBlank())
-                ? service.listByRole(role)
-                : service.listAll();
-        return ResponseEntity.ok(users.stream()
+        var pageable = PageRequest.of(page, size);
+        Page<User> result = (role != null && !role.isBlank())
+                ? service.listByRole(role, pageable)
+                : service.listAll(pageable);
+        List<UserResponse> content = result.getContent().stream()
                 .map(u -> new UserResponse(u.getId(), u.getName(), u.getEmail(), u.getRoles()))
-                .toList());
+                .toList();
+        return ResponseEntity.ok(new PageResponse<>(content, result.getNumber(), result.getSize(),
+                result.getTotalElements(), result.getTotalPages()));
     }
 }

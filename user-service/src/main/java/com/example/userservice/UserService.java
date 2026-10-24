@@ -4,7 +4,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import java.util.Optional;
 
 @Service
@@ -41,7 +43,9 @@ public class UserService {
 
     public Optional<User> findByEmail(String email) { return repository.findByEmailIgnoreCase(email); }
 
-    public List<User> listAll() { return repository.findAll(); }
+    public Page<User> listAll(Pageable pageable) { return repository.findAll(pageable); }
 
-    public List<User> listByRole(String role) { return repository.findByRolesContaining(role); }
+    public Page<User> listByRole(String role, Pageable pageable) {
+        return repository.findByRolesContaining(role, pageable);
+    }
 }

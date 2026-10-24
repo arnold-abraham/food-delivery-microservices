@@ -4,6 +4,8 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,6 +25,8 @@ public class DeliveryController {
             @NotBlank(message = "status is required") String status
     ) {}
 
+    public record PageResponse<T>(List<T> content, int page, int size, long totalElements, int totalPages) {}
+
     private final DeliveryService service;
 
     public DeliveryController(DeliveryService service) {
@@ -30,8 +34,16 @@ public class DeliveryController {
     }
 
     @GetMapping
-    public List<Delivery> list(@RequestParam(required = false) Long driverId) {
-        return driverId != null ? service.listByDriverId(driverId) : service.listAll();
+    public PageResponse<Delivery> list(
+            @RequestParam(required = false) Long driverId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        var pageable = PageRequest.of(page, size);
+        Page<Delivery> result = driverId != null
+                ? service.listByDriverId(driverId, pageable)
+                : service.listAll(pageable);
+        return new PageResponse<>(result.getContent(), result.getNumber(), result.getSize(),
+                result.getTotalElements(), result.getTotalPages());
     }
 
     @GetMapping("/{id}")

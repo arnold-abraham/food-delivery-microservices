@@ -9,6 +9,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -86,12 +89,12 @@ public class OrderService {
         return repository.findById(id);
     }
 
-    public List<Order> listAll() {
-        return repository.findAll();
+    public Page<Order> listAll(Pageable pageable) {
+        return repository.findAll(pageable);
     }
 
-    public List<Order> listByUserId(Long userId) {
-        return repository.findByUserId(userId);
+    public Page<Order> listByUserId(Long userId, Pageable pageable) {
+        return repository.findByUserId(userId, pageable);
     }
 
     public List<OrderItem> getItems(Long orderId) {
@@ -157,17 +160,21 @@ public class OrderService {
         return pay(orderId, amount, null);
     }
 
+    @SuppressWarnings("unchecked")
     private long pickRandomDriver() {
         try {
-            String url = userServiceBaseUrl + "/users?role=DRIVER";
-            List<Map<String, Object>> drivers = restTemplate.exchange(
+            String url = userServiceBaseUrl + "/users?role=DRIVER&page=0&size=100";
+            Map<String, Object> response = restTemplate.exchange(
                     url, HttpMethod.GET, null,
-                    new ParameterizedTypeReference<List<Map<String, Object>>>() {}
+                    new ParameterizedTypeReference<Map<String, Object>>() {}
             ).getBody();
-            if (drivers != null && !drivers.isEmpty()) {
-                Map<String, Object> picked = drivers.get(random.nextInt(drivers.size()));
-                Object id = picked.get("id");
-                if (id instanceof Number n) return n.longValue();
+            if (response != null) {
+                List<Map<String, Object>> drivers = (List<Map<String, Object>>) response.get("content");
+                if (drivers != null && !drivers.isEmpty()) {
+                    Map<String, Object> picked = drivers.get(random.nextInt(drivers.size()));
+                    Object id = picked.get("id");
+                    if (id instanceof Number n) return n.longValue();
+                }
             }
         } catch (RestClientException ex) {
             // user-service unavailable — fall back to ID 1
