@@ -29,7 +29,14 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> get(@PathVariable Long id) {
+    public ResponseEntity<?> get(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-User-Id", required = false) Long callerId,
+            @RequestHeader(value = "X-User-Roles", required = false) String roles) {
+        boolean isAdmin = roles != null && roles.contains("ADMIN");
+        if (!isAdmin && !id.equals(callerId)) {
+            return ResponseEntity.status(403).body(Map.of("error", "Access denied"));
+        }
         return service.get(id)
                 .<ResponseEntity<?>>map(u -> ResponseEntity.ok(new UserResponse(u.getId(), u.getName(), u.getEmail(), u.getRoles())))
                 .orElseGet(() -> ResponseEntity.status(404).body(Map.of("error", "User not found")));

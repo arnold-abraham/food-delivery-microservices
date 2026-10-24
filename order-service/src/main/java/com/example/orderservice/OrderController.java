@@ -43,11 +43,17 @@ public class OrderController {
     public OrderController(OrderService service) { this.service = service; }
 
     @PostMapping
-    public ResponseEntity<OrderResponse> create(@Valid @RequestBody CreateOrderRequest req) {
+    public ResponseEntity<?> create(
+            @Valid @RequestBody CreateOrderRequest req,
+            @RequestHeader(value = "X-User-Id", required = false) Long callerId,
+            @RequestHeader(value = "X-User-Roles", required = false) String roles) {
+        boolean isAdmin = roles != null && roles.contains("ADMIN");
+        if (!isAdmin && !req.userId().equals(callerId)) {
+            return ResponseEntity.status(403).body(Map.of("error", "Cannot place order on behalf of another user"));
+        }
         List<OrderService.CreateOrderItem> items = req.items() == null ? List.of() : req.items().stream()
                 .map(i -> new OrderService.CreateOrderItem(i.menuItemId(), i.quantity()))
                 .toList();
-
         Order o = service.create(req.userId(), req.restaurantId(), items);
         return ResponseEntity.ok(toResponse(o));
     }
