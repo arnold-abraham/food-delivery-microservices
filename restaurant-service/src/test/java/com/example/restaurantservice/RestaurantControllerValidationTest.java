@@ -5,6 +5,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -20,8 +22,9 @@ class RestaurantControllerValidationTest {
     static class StubConfig {
         @Bean
         RestaurantService restaurantService() {
-            // Not used in this test (validation fails before controller calls service)
             return new RestaurantService(null) {
+                @Override public Page<Restaurant> list(Pageable p) { return Page.empty(p); }
+                @Override public Page<Restaurant> listByCuisine(String c, Pageable p) { return Page.empty(p); }
             };
         }
     }
@@ -41,9 +44,9 @@ class RestaurantControllerValidationTest {
     }
 
     @Test
-    void listRestaurants_missingCuisine_returns400() throws Exception {
+    void listRestaurants_missingCuisine_returnsEmptyPage() throws Exception {
         mvc.perform(get("/restaurants"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("cuisine query param is required"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray());
     }
 }

@@ -51,11 +51,17 @@ class OrderFlowSmokeTest {
                 .andExpect(method(org.springframework.http.HttpMethod.POST))
                 .andRespond(withSuccess("{\"orderId\":1,\"status\":\"SUCCESS\",\"message\":\"Payment accepted\"}", MediaType.APPLICATION_JSON));
 
+        // user-service: driver lookup during pay
+        mockServer.expect(requestTo("http://localhost/users?role=DRIVER&page=0&size=100"))
+                .andExpect(method(org.springframework.http.HttpMethod.GET))
+                .andRespond(withSuccess("{\"content\":[{\"id\":5,\"name\":\"Driver\",\"role\":\"DRIVER\"}],\"page\":0,\"size\":100,\"totalElements\":1,\"totalPages\":1}", MediaType.APPLICATION_JSON));
+
         // Create order with items
         String createJson = "{\"userId\":2,\"restaurantId\":1,\"items\":[{\"menuItemId\":10,\"quantity\":2}]}";
 
         String createdBody = mvc.perform(post("/orders")
                         .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-User-Id", "2")
                         .content(createJson))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalAmount").value(24.0))
@@ -69,6 +75,7 @@ class OrderFlowSmokeTest {
         String payJson = "{\"amount\":24,\"driverId\":5}";
         mvc.perform(post("/orders/" + orderId + "/pay")
                         .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-User-Id", "2")
                         .content(payJson))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PAID"));
