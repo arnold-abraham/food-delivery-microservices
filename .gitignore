@@ -45,6 +45,9 @@ frontend/
 # Local secrets — never commit
 .env
 
+# Playwright MCP
+.playwright-mcp/
+
 # Terraform state and provider cache — never commit
 terraform/.terraform/
 terraform/.terraform.lock.hcl
