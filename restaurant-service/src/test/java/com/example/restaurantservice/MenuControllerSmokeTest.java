@@ -27,6 +27,7 @@ class MenuControllerSmokeTest {
     void createRestaurantAndMenuItemThenList() throws Exception {
         String restaurantJson = mvc.perform(post("/restaurants")
                         .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-User-Roles", "ADMIN")
                         .content("{\"name\":\"Testaurant\",\"cuisine\":\"Italian\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").isNumber())
@@ -36,11 +37,12 @@ class MenuControllerSmokeTest {
 
         mvc.perform(get("/restaurants?cuisine=Italian"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").isNumber())
-                .andExpect(jsonPath("$[0].cuisine").value("Italian"));
+                .andExpect(jsonPath("$.content[0].id").isNumber())
+                .andExpect(jsonPath("$.content[0].cuisine").value("Italian"));
 
         mvc.perform(post("/restaurants/" + restaurantId + "/menu")
                         .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-User-Roles", "ADMIN")
                         .content("{\"name\":\"Pizza\",\"price\":12}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").isNumber())

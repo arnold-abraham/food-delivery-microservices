@@ -41,6 +41,7 @@ class DeliveryControllerSmokeTest {
 
         String createdJson = mvc.perform(post("/deliveries")
                         .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-User-Roles", "ADMIN")
                         .content(createBody))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").isNumber())
@@ -62,6 +63,7 @@ class DeliveryControllerSmokeTest {
 
         mvc.perform(patch("/deliveries/" + id + "/status")
                         .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-User-Roles", "ADMIN")
                         .content(updateBody))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PICKED_UP"));
